@@ -1,0 +1,10 @@
+ZEUS data vs. Pythia setting + Sullivan with JAM21 (bin averaged), chi^2/N
+==========================================================================
+
+PDF set                                            chi2        N       chi2/N
+-----------------------------------------------------------------------------
+Pythia default + JAM21                        3527.8394      288      12.2494
+CT18NLO + Tuning + JAM21                      6782.9797      288      23.5520
+CT18NLO + JAM21                               4233.2567      288      14.6988
+CT18NLO+Remnant + JAM21                       3177.0041      288      11.0313
+CT18NLO + Gluon + JAM21                       4381.0681      288      15.2120

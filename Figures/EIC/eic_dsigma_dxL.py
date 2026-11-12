@@ -1,0 +1,803 @@
+#!/usr/bin/env python3
+"""Comparison plots of the three EIC samples, among them dsigma/dx_L after the fiducial cuts
+(Fig. 13).
+
+Usage: python3 eic_dsigma_dxL.py [5x41.root 10x100.root 18x275.root]
+"""
+
+import os
+PYTHIA_OUT = os.environ.get("PYTHIA_OUT", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Pythia", "output"))
+import sys
+
+import numpy as np
+import uproot
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.patheffects as pe
+from matplotlib.colors import LogNorm
+
+# Configuration
+
+# Beam-energy configs: 5x41, 10x100, 18x275 (Ee x Ep, GeV)
+# NB: "\\wsl.localhost\Ubuntu\..." is just the Windows-Explorer view of the
+# WSL filesystem; from inside Ubuntu (where this script runs) the same files
+# are at the native paths below.
+FILES = sys.argv[1:] or [
+    os.path.join(PYTHIA_OUT, "eic_5x41.root"),
+    os.path.join(PYTHIA_OUT, "eic_10x100.root"),
+    os.path.join(PYTHIA_OUT, "eic_18x275.root"),
+]
+TREENAME = "tree"
+OUTDIR = "plots"
+
+# Read big ROOT files in bounded-size chunks with caching off, instead of
+# tree.arrays(...) all at once -- 18275.root etc. are large enough that a
+# single uncached decompress-everything read can spike memory hard enough
+# to get the process (and sometimes WSL itself) OOM-killed.
+CHUNK_SIZE = 2_000_000      # rows per uproot.iterate() chunk
+
+# Cap on the random reservoir kept per (observable, cut-state) for estimating
+# percentile-based axis ranges -- bounded regardless of file size. Does NOT
+# affect the final histogram counts (those come from the exact pass-2 scan).
+RESERVOIR_CAP = 300_000
+
+# Acceptance cuts
+THETA_E_MIN_DEG = 135.0     # deg
+THETA_E_MAX_DEG = 178.0     # deg
+EEPRIME_MIN = 1.0           # GeV
+THETA_N_MAX_MRAD = 5.0      # mrad -- fallback; see CFG_THETA_N_MRAD
+
+# Pythia's info.weight() is 1 for the vast majority of events but has a long
+# tail here; set to True only if the generation was actually biased.
+USE_WEIGHTS = False
+
+# radiative tail removal
+# Q2 and xB are rebuilt from the FINAL-STATE electron, so QED radiation off the
+# lepton smears events below the generated phase space and out to xB > 1.
+# NB: Q2_GEN_MIN is NOT simply PhaseSpace:Q2Min.  With the default
+# PhaseSpace:pTHatMinDiverge = 1 GeV, Pythia enforces pThat^2 = Q^2(1-y) > 1,
+# hence Q^2 > 1 whatever Q2Min is set to, and any Q2Min < pTHatMinDiverge^2 is
+# ignored outright.
+DROP_RADIATIVE = True
+Q2_GEN_MIN = 1.0            # GeV^2, effective generated floor
+XB_MAX_PHYS = 1.0
+
+# density normalisation
+#     per-event weight  w = sigma_gen[nb] * 1e6 [fb/nb] * L[fb^-1] / N_generated
+#     density           = sum(w) / (dxB * dQ2)      <- LINEAR bin widths
+LUMI_FB = 10.0              # fb^-1
+
+# dsigma/dx_L
+#     dsigma/dx_L [bin] = (sigma_gen / N_NORM) * (dN[bin] / dx_L)
+# x_L bins: 0 to 1, uniform width XL_DELTA. N_NORM is the fixed normalization
+# requested (5e8) -- swap to run["N_gen"] per-file if the true generated
+# count should be used instead.
+XL_DELTA = 0.02                          # x_L bin width
+XL_EDGES = np.round(np.arange(0.0, 1.0 + 0.5 * XL_DELTA, XL_DELTA), 6)
+N_NORM = 5.0e8
+print(f"[info] x_L binning: {len(XL_EDGES) - 1} bins of "
+      f"Delta x_L = {XL_DELTA:g} over [{XL_EDGES[0]:g}, {XL_EDGES[-1]:g}]")
+
+# How the 1D comparison overlays are normalised:
+#   "counts" : raw events (same N_generated per file -> directly comparable)
+#   "lumi"   : events expected in LUMI_FB (folds in the different sigma_gen)
+#   "shape"  : unit area, for comparing shapes only
+COMPARE_MODE = "counts"
+
+# Iso-y lines:  Q^2 = xB * y * s
+Y_LINES = [1.0, 0.5, 0.1, 0.01]
+
+# Common axes for all beam configs, so the rows can be compared by eye.
+XB_LIM = (1e-5, 1.0)
+Q2_LIM = (1.0, 100.0)
+X_EDGES = np.logspace(np.log10(XB_LIM[0]), np.log10(XB_LIM[1]), 61)
+Q2_EDGES = np.logspace(np.log10(max(Q2_GEN_MIN, Q2_LIM[0])),
+                       np.log10(Q2_LIM[1]), 41)
+
+MAKE_PER_ENERGY_ROW = True   # also write one 1x4 figure per file
+MAKE_COMPARISONS = True      # also write the per-observable overlays
+
+COLORS = ["black", "#d62728", "#0096FF", "#2ca02c", "#9467bd", "#ff7f0e"]
+
+# Style
+
+plt.rcParams.update({
+    "figure.dpi": 150,
+    "savefig.dpi": 150,
+    "font.size": 14,
+    "font.weight": "bold",
+    "axes.labelsize": 16,
+    "axes.labelweight": "bold",
+    "xtick.labelsize": 12,
+    "ytick.labelsize": 12,
+    "axes.linewidth": 1.4,
+    "xtick.major.size": 6,
+    "ytick.major.size": 6,
+    "xtick.minor.size": 3,
+    "ytick.minor.size": 3,
+    "xtick.direction": "in",
+    "ytick.direction": "in",
+    "xtick.top": True,
+    "ytick.right": True,
+    "mathtext.default": "bf",   # bold the math (e.g. $\times$, $Q^2$) parts of legend/labels too
+})
+
+os.makedirs(OUTDIR, exist_ok=True)
+
+
+def bold_ticks(ax):
+    for lbl in ax.get_xticklabels() + ax.get_yticklabels():
+        lbl.set_fontweight("bold")
+    for lbl in ax.get_xticklabels(minor=True) + ax.get_yticklabels(minor=True):
+        lbl.set_fontweight("bold")
+
+
+def bold_legend(leg):
+    if leg is None:
+        return leg
+    for txt in leg.get_texts():
+        txt.set_fontweight("bold")
+    title = leg.get_title()
+    if title is not None:
+        title.set_fontweight("bold")
+    return leg
+
+if Q2_GEN_MIN < Q2_LIM[0]:
+    print(f"[warn] Q2_GEN_MIN = {Q2_GEN_MIN} is below the axis floor "
+          f"{Q2_LIM[0]}: bins between them are not drawn.")
+
+BRANCHES = ["Q2", "xB", "y", "W2", "s", "xL", "xpi", "t", "MX2", "pT",
+            "En", "Pn", "pz_n", "theta_n", "eta_n", "rapidity_n", "phi_n",
+            "EePrime", "PePrime", "theta_e", "eta_e", "rapidity_e", "phi_e",
+            "weight", "nNeutrons"]
+
+# key -> (latex label, log x?)  -- moved up: pass 1 needs this to know which
+# observables to reservoir-sample and whether to filter to >0 for each.
+OBS = {
+    "Q2":           (r"$Q^2$ [GeV$^2$]",        True),
+    "xB":           (r"$x_B$",                  True),
+    "y":            (r"$y$",                    True),
+    "W2":           (r"$W^2$ [GeV$^2$]",        True),
+    "EePrime":      (r"$E_{e'}$ [GeV]",         False),
+    "PePrime":      (r"$|\vec{p}_{e'}|$ [GeV]", False),
+    "theta_e_deg":  (r"$\theta_{e'}$ [deg]",    False),
+    "eta_e":        (r"$\eta_{e'}$",            False),
+    "rapidity_e":   (r"$y_{e'}$",               False),
+    "phi_e":        (r"$\phi_{e'}$ [rad]",      False),
+    "En":           (r"$E_n$ [GeV]",            False),
+    "Pn":           (r"$|\vec{p}_n|$ [GeV]",    False),
+    "pT":           (r"$p_T^{\,n}$ [GeV]",      False),
+    "pz_n":         (r"$p_z^{\,n}$ [GeV]",      False),
+    "xL":           (r"$x_L$",                  False),
+    "minus_t":      (r"$-t$ [GeV$^2$]",         False),
+    "MX2":          (r"$M_X^2$ [GeV$^2$]",      False),
+    "theta_n_mrad": (r"$\theta_n$ [mrad]",      True),
+    "eta_n":        (r"$\eta_n$",               False),
+    "rapidity_n":   (r"$y_n$",                  False),
+    "phi_n":        (r"$\phi_n$ [rad]",         False),
+    "nNeutrons":    (r"$N_n$",                  False),
+    "xpi":          (r"$x_\pi$",                True),
+}
+
+# extra Q2 axis-scale variants -- original Q2.png stays log-x/log-y
+EXTRA_SCALE_VARIANTS = {
+    "Q2": [("linear", "log",    "Q2_linx_logy.png"),
+           ("linear", "linear", "Q2_linx_liny.png")],
+}
+
+YLAB = {"counts": "Events",
+        "lumi": f"Events / {LUMI_FB:g} fb$^{{-1}}$",
+        "shape": "normalised to unit area"}[COMPARE_MODE]
+
+# Shared per-chunk helpers
+
+
+def guess_beams(s):
+    prod = s / 4.0
+    for ee, ep in [(18, 275), (10, 100), (5, 100), (5, 41), (18, 100),
+                   (10, 275), (5, 275), (10, 41), (18, 41)]:
+        if abs(ee * ep - prod) < 1e-6:
+            return ee, ep
+    return None, None
+
+
+# The neutron angular acceptance is per beam config: the faster the proton
+# beam, the smaller the angle a given p_T subtends. Keyed by the tag that
+# guess_beams() produces; THETA_N_MAX_MRAD above is the fallback for a config
+# that is not listed here.
+CFG_THETA_N_MRAD = {
+    "5x41":   5.0,
+    "10x100": 2.5,
+    "18x275": 1.0,
+}
+
+
+def theta_n_max_for(s):
+    """theta_n cut (mrad) for the beam config with this s."""
+    ee, ep = guess_beams(s)
+    return CFG_THETA_N_MRAD.get(f"{ee}x{ep}", THETA_N_MAX_MRAD)
+
+
+def chunk_derive(raw, n_chunk, theta_n_max=None):
+    """Pure function of ONE chunk: cuts, radiative mask, weights, and the
+    derived per-event observable dict. Everything it touches is garbage
+    collected once the caller's loop moves to the next chunk -- nothing here
+    is ever accumulated across the whole file.
+    """
+    theta_e_deg = np.degrees(raw["theta_e"])
+    theta_n_mrad = 1000.0 * raw["theta_n"]
+
+    th_n = THETA_N_MAX_MRAD if theta_n_max is None else theta_n_max
+    CUT = ((theta_e_deg > THETA_E_MIN_DEG)
+           & (theta_e_deg < THETA_E_MAX_DEG)
+           & (raw["EePrime"] > EEPRIME_MIN)
+           & (np.abs(theta_n_mrad) < th_n))
+    RAD_OK = (((raw["Q2"] >= Q2_GEN_MIN) & (raw["xB"] <= XB_MAX_PHYS))
+              if DROP_RADIATIVE else np.ones(n_chunk, dtype=bool))
+    weights_true = raw["weight"].astype(float) if USE_WEIGHTS else np.ones(n_chunk)
+
+    d = {
+        "Q2":           raw["Q2"],
+        "xB":           raw["xB"],
+        "y":            raw["y"],
+        "W2":           raw["W2"],
+        "EePrime":      raw["EePrime"],
+        "PePrime":      raw["PePrime"],
+        "theta_e_deg":  theta_e_deg,
+        "eta_e":        raw["eta_e"],
+        "rapidity_e":   raw["rapidity_e"],
+        "phi_e":        raw["phi_e"],
+        "En":           raw["En"],
+        "Pn":           raw["Pn"],
+        "pT":           raw["pT"],
+        "pz_n":         raw["pz_n"],
+        "xL":           raw["xL"],
+        "minus_t":      -raw["t"],
+        "MX2":          raw["MX2"],
+        "theta_n_mrad": theta_n_mrad,
+        "eta_n":        raw["eta_n"],
+        "rapidity_n":   raw["rapidity_n"],
+        "phi_n":        raw["phi_n"],
+        "nNeutrons":    raw["nNeutrons"].astype(float),
+        "xpi":          raw["xpi"],
+    }
+    for k in ("rapidity_e", "rapidity_n"):        # a.cpp sentinels
+        d[k] = np.where(d[k] < -900, np.nan, d[k])
+    d["xpi"] = np.where(d["xpi"] <= 0, np.nan, d["xpi"])
+    d = {k: np.asarray(v, dtype=float) for k, v in d.items()}
+    return d, CUT, RAD_OK, weights_true
+
+
+def reservoir_update(buf, new_vals):
+    """Approximate streaming reservoir: merge the existing sample with the
+    new chunk's values, then randomly thin back down to RESERVOIR_CAP. Used
+    only to estimate axis-range percentiles -- bounded memory regardless of
+    how many events the file has.
+    """
+    if new_vals.size == 0:
+        return buf
+    combined = np.concatenate([buf, new_vals]) if buf.size else new_vals
+    if combined.size <= RESERVOIR_CAP:
+        return combined
+    idx = np.random.choice(combined.size, size=RESERVOIR_CAP, replace=False)
+    return combined[idx]
+
+
+# Pass 1 -- 2D histograms (exact, fixed bins) + reservoirs + scalar stats
+
+def load_pass1(path, color):
+    print(f"[info] opening {path}:{TREENAME}")
+    # object_cache=None / array_cache=None + chunked tree.iterate() keeps
+    # uproot from holding every decompressed basket in memory at once, AND
+    # (unlike the old version) we never concatenate the chunks back together
+    # -- each chunk is folded into small fixed-size accumulators and dropped.
+    rfile = uproot.open(path, object_cache=None, array_cache=None)
+    tree = rfile[TREENAME]
+    n = tree.num_entries
+
+    def meta(key):
+        try:
+            return rfile[key].member("fVal")
+        except Exception:
+            return None
+
+    r = {"path": path, "color": color, "n_tot": n}
+    r["sigma"] = meta("sigmaGen_nb")
+    r["N_gen"] = meta("nGenerated") or float(n)
+    r["N_dis"] = meta("nDIS")
+    r["N_neu"] = meta("nNeutronEvt")
+    r["w_sum"] = meta("weightSum")
+    try:
+        r["pdf"] = rfile["pdfSet"].member("fTitle")
+    except Exception:
+        r["pdf"] = "unknown"
+
+    r["H2D"] = {False: np.zeros((len(X_EDGES) - 1, len(Q2_EDGES) - 1)),
+                True:  np.zeros((len(X_EDGES) - 1, len(Q2_EDGES) - 1))}
+    r["n2D"] = {False: 0, True: 0}
+    r["xL_H"] = {False: np.zeros(len(XL_EDGES) - 1),
+                 True:  np.zeros(len(XL_EDGES) - 1)}
+    r["reservoir"] = {}
+    r["n_finite"] = {}
+
+    n_cut_total = 0
+    n_radok_dropped = 0
+    n_seen = 0
+    s_val = None
+
+    for chunk in tree.iterate(BRANCHES, step_size=CHUNK_SIZE, library="np"):
+        n_chunk = len(chunk["Q2"])
+        n_seen += n_chunk
+        if s_val is None:
+            s_val = float(chunk["s"][0])
+            theta_n_max = theta_n_max_for(s_val)
+            r["theta_n_max"] = theta_n_max
+            print(f"       neutron cut for this config: "
+                  f"theta_n < {theta_n_max:g} mrad")
+
+        d, CUT, RAD_OK, weights_true = chunk_derive(chunk, n_chunk,
+                                                    theta_n_max)
+        NOCUT = np.ones(n_chunk, dtype=bool)
+        n_cut_total += int((CUT & RAD_OK).sum())
+        n_radok_dropped += int((~RAD_OK).sum())
+
+        for cutstate, mask_src in ((False, NOCUT), (True, CUT)):
+            m = mask_src & RAD_OK
+            x, q, w = d["xB"][m], d["Q2"][m], weights_true[m]
+            g = np.isfinite(x) & np.isfinite(q) & (x > 0) & (q > 0)
+            H, _, _ = np.histogram2d(x[g], q[g], bins=[X_EDGES, Q2_EDGES], weights=w[g])
+            r["H2D"][cutstate] += H
+            r["n2D"][cutstate] += int(g.sum())
+
+            xl = d["xL"][m]
+            wl = weights_true[m]
+            gl = np.isfinite(xl)
+            hxl, _ = np.histogram(xl[gl], bins=XL_EDGES, weights=wl[gl])
+            r["xL_H"][cutstate] += hxl
+
+            for key in OBS:
+                v = d[key][m]
+                gv = np.isfinite(v)
+                if OBS[key][1]:
+                    gv &= v > 0
+                v = v[gv]
+                key_c = (key, cutstate)
+                r["n_finite"][key_c] = r["n_finite"].get(key_c, 0) + v.size
+                r["reservoir"][key_c] = reservoir_update(
+                    r["reservoir"].get(key_c, np.array([])), v)
+
+        print(f"    ... {n_seen:,}/{n:,} entries "
+              f"({100 * n_seen / max(n, 1):5.1f} %)", end="\r")
+    print()
+
+    r["s"] = s_val
+    ee, ep = guess_beams(r["s"])
+    r["Ee"], r["Ep"] = ee, ep
+    r["tag"] = f"{ee}x{ep}" if ee else f"s{r['s']:.0f}"
+    r["label"] = (rf"{ee}$\times${ep} GeV" if ee
+                  else rf"$\sqrt{{s}}$ = {np.sqrt(r['s']):.1f} GeV")
+    r["beam_label"] = (f"$E_e$ = {ee} GeV\n$E_p$ = {ep} GeV" if ee
+                       else f"$\\sqrt{{s}}$ = {np.sqrt(r['s']):.1f} GeV")
+
+    denom = r["w_sum"] if (USE_WEIGHTS and r["w_sum"]) else r["N_gen"]
+    r["lumi_w"] = (r["sigma"] * 1e6 * LUMI_FB / denom) if r["sigma"] else 1.0
+
+    r["n_cut"] = n_cut_total
+    r["n_radok_dropped"] = n_radok_dropped
+
+    print(f"       {r['tag']}   s = {r['s']:g} GeV^2   PDF = {r['pdf']}")
+    print(f"       entries = {n}   N_gen = {r['N_gen']:.0f}   "
+          f"sigma_gen = {r['sigma']:.4g} nb")
+    print(f"       weightSum = {r['w_sum']:.6g}"
+          + ("  (== N_gen: unweighted)"
+             if r["w_sum"] and abs(r["w_sum"] - r["N_gen"]) < 1
+             else "  (!= N_gen: WEIGHTED run -> USE_WEIGHTS = True)"))
+    print(f"       after cuts = {r['n_cut']} ({100*r['n_cut']/n:.2f} %)"
+          f"   radiative dropped = {r['n_radok_dropped']}"
+          f" ({100*r['n_radok_dropped']/n:.2f} %)")
+    print(f"       weight for L = {LUMI_FB:g} fb^-1 : {r['lumi_w']:.4g}/event")
+    return r
+
+
+def common_bins(key, cut, nbins=100, logx=None):
+    """Bin edges spanning every file, estimated from the pooled per-run
+    reservoir samples (NOT the full dataset) -- keeps this bounded in memory
+    regardless of file size. The final histogram counts (pass 2) are exact;
+    only the axis range comes from the sample.
+    """
+    if logx is None:
+        logx = OBS[key][1]
+    lo, hi = np.inf, -np.inf
+    for run in RUNS:
+        v = run["reservoir"].get((key, cut))
+        if v is None or v.size < 2:
+            continue
+        a, b = np.percentile(v, [0.05, 99.95])
+        lo, hi = min(lo, a), max(hi, b)
+    if not np.isfinite(lo) or hi <= lo:
+        return None
+    if logx:
+        return np.logspace(np.log10(lo), np.log10(hi), nbins + 1)
+    pad = 0.02 * (hi - lo)
+    return np.linspace(lo - pad, hi + pad, nbins + 1)
+
+
+def build_edge_jobs():
+    """Every (key, cutstate, logx) bin-edge set needed for the 1D overlays,
+    fixed once from the pooled reservoirs. Pass 2 then streams each file
+    once more and accumulates EXACT counts into these edges -- 541jam.py's
+    'decide the bins up front, then histogram while streaming' pattern.
+    """
+    jobs = {}
+    for key in OBS:
+        for cutstate in (False, True):
+            logx = OBS[key][1]
+            edges = common_bins(key, cutstate, logx=logx)
+            if edges is not None:
+                jobs[(key, cutstate, logx)] = edges
+    for key, variants in EXTRA_SCALE_VARIANTS.items():
+        for xscale, _, _ in variants:
+            logx = (xscale == "log")
+            for cutstate in (False, True):
+                if (key, cutstate, logx) not in jobs:
+                    edges = common_bins(key, cutstate, logx=logx)
+                    if edges is not None:
+                        jobs[(key, cutstate, logx)] = edges
+    return jobs
+
+
+# Pass 2 -- exact 1D histograms into the fixed bins from build_edge_jobs()
+
+def load_pass2(run, edge_jobs):
+    path = run["path"]
+    print(f"[info] re-streaming {path} for 1D histograms ...")
+    rfile = uproot.open(path, object_cache=None, array_cache=None)
+    tree = rfile[TREENAME]
+    n = tree.num_entries
+
+    hist = {job: np.zeros(len(edges) - 1) for job, edges in edge_jobs.items()}
+    n_seen = 0
+    for chunk in tree.iterate(BRANCHES, step_size=CHUNK_SIZE, library="np"):
+        n_chunk = len(chunk["Q2"])
+        n_seen += n_chunk
+        d, CUT, RAD_OK, weights_true = chunk_derive(
+            chunk, n_chunk, run.get("theta_n_max"))
+        NOCUT = np.ones(n_chunk, dtype=bool)
+
+        for (key, cutstate, logx), edges in edge_jobs.items():
+            m = (CUT if cutstate else NOCUT) & RAD_OK
+            v = d[key][m]
+            w = weights_true[m]
+            g = np.isfinite(v)
+            if logx:
+                g &= v > 0
+            h, _ = np.histogram(v[g], bins=edges, weights=w[g])
+            hist[(key, cutstate, logx)] += h
+
+        print(f"    ... {n_seen:,}/{n:,} entries "
+              f"({100 * n_seen / max(n, 1):5.1f} %)", end="\r")
+    print()
+    run["hist1d"] = hist
+    return run
+
+
+# Load pass 1 for every file
+
+RUNS = [load_pass1(f, COLORS[i % len(COLORS)]) for i, f in enumerate(FILES)]
+
+# keep the per-file output names unique even if two files share a beam config
+_seen = {}
+for r in RUNS:
+    _seen[r["tag"]] = _seen.get(r["tag"], 0) + 1
+for r in RUNS:
+    if _seen[r["tag"]] > 1:
+        r["tag"] += "_" + os.path.splitext(os.path.basename(r["path"]))[0]
+
+def cut_text(theta_n=None):
+    """Cut list for annotations. With no argument the theta_n line lists every
+    config's value, for figures that overlay all of them.
+    """
+    if theta_n is None:
+        vals = " / ".join(f"{CFG_THETA_N_MRAD[k]:g}"
+                          for k in ("5x41", "10x100", "18x275")
+                          if k in CFG_THETA_N_MRAD)
+        th = rf"$\theta_n<${vals} mrad (per config)"
+    else:
+        th = rf"$\theta_n<{theta_n:g}$ mrad"
+    return (r"$135^\circ<\theta_{e'}<178^\circ$" "\n"
+            r"$E_{e'}>1$ GeV" "\n" + th)
+
+
+CUT_TEXT = cut_text()      # generic, for the multi-config figures
+
+if USE_WEIGHTS:
+    NORM_FORMULA = (
+        r"$\dfrac{\mathrm{d}^2N}{\mathrm{d}x_B\,\mathrm{d}Q^2}"
+        r" = \dfrac{\sigma_{\rm gen}\,L}{\sum w}\cdot"
+        r"\dfrac{\sum_{\rm bin} w_i}{\Delta x_B\,\Delta Q^2}$")
+else:
+    NORM_FORMULA = (
+        r"$\dfrac{\mathrm{d}^2N}{\mathrm{d}x_B\,\mathrm{d}Q^2}"
+        r" = \dfrac{\sigma_{\rm gen}\,L}{N_{\rm gen}}\cdot"
+        r"\dfrac{\Delta N}{\Delta x_B\,\Delta Q^2}$")
+
+# Q2 vs xB panels -- pass-1 data only (H2D is already exact and fixed-size)
+
+
+def draw_hist2d_from_H(ax, H, divide_by_area=False, dyn_range=1e8):
+    if divide_by_area:
+        H = H / np.outer(np.diff(X_EDGES), np.diff(Q2_EDGES))
+        vmax = max(H.max(), 1.0)
+        vmin = H[H > 0].min() if np.any(H > 0) else vmax / dyn_range
+        vmin = max(vmin, vmax / dyn_range)
+    else:
+        vmax = max(H.max(), 1.0)
+        vmin = 0.5
+    Hm = np.ma.masked_where(H <= 0, H)
+    return ax.pcolormesh(X_EDGES, Q2_EDGES, Hm.T, cmap="rainbow",
+                         norm=LogNorm(vmin=vmin, vmax=vmax))
+
+
+def draw_y_lines(ax, s_cm, ylines=Y_LINES, fs=7, frac=0.55, lw=1.1):
+    """Q2 = xB*y*s iso-lines, labelled along the line (angle from the display
+    transform, so it follows the line at any aspect ratio).
+    """
+    x0, x1 = ax.get_xlim()
+    q0, q1 = ax.get_ylim()
+    xx = np.logspace(np.log10(x0), np.log10(x1), 200)
+    handle = None
+    ax.figure.canvas.draw()
+    for yv in ylines:
+        handle, = ax.plot(xx, xx * yv * s_cm, color="red", lw=lw, zorder=5,
+                          solid_capstyle="butt")
+        xa = max(x0, q0 / (yv * s_cm))
+        xb = min(x1, q1 / (yv * s_cm))
+        if xb <= xa:
+            continue
+        xlab = 10 ** (np.log10(xa) + frac * (np.log10(xb) - np.log10(xa)))
+        qlab = xlab * yv * s_cm
+        p1 = ax.transData.transform((xlab, qlab))
+        p2 = ax.transData.transform((xlab * 1.02, qlab * 1.02))
+        ang = np.degrees(np.arctan2(p2[1] - p1[1], p2[0] - p1[0]))
+        # white outline, not a filled bbox, which would blank out bins
+        ax.text(xlab, qlab, f"$y$ = {yv:g}", color="red", fontsize=fs,
+                rotation=ang, rotation_mode="anchor", fontweight="bold",
+                ha="center", va="bottom", zorder=6,
+                path_effects=[pe.withStroke(linewidth=2.0,
+                                            foreground="white")])
+    return handle
+
+
+def panel(ax, run, cut, density, title):
+    H = run["H2D"][cut] * (run["lumi_w"] if density else 1.0)
+    pcm = draw_hist2d_from_H(ax, H, divide_by_area=density)
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlim(*XB_LIM)
+    ax.set_ylim(*Q2_LIM)
+    ax.set_xlabel(r"$x_B$", fontsize=13)
+    ax.set_ylabel(r"$Q^2$ [GeV$^2$]", fontsize=13)
+    ax.tick_params(labelsize=9)
+    bold_ticks(ax)
+
+    cb = ax.figure.colorbar(pcm, ax=ax, fraction=0.046, pad=0.02)
+    cb.set_label(rf"$\mathrm{{d}}^2N/\mathrm{{d}}x_B\,\mathrm{{d}}Q^2$ / "
+                 rf"{LUMI_FB:g} fb$^{{-1}}$ [GeV$^{{-2}}$]"
+                 if density else "Events", fontsize=9)
+    cb.ax.tick_params(labelsize=7)
+
+    h = draw_y_lines(ax, run["s"])
+    if h is not None:
+        leg = ax.legend([h],
+                        [r"$Q^2 = x_B\,y\,s$  ($y$ = "
+                         + ", ".join(f"{v:g}" for v in Y_LINES) + ")"],
+                        loc="upper right", fontsize=6.5, framealpha=0.92,
+                        handlelength=1.4, borderpad=0.3)
+        leg.set_zorder(8)
+        bold_legend(leg)
+
+    info = run["beam_label"]
+    if density:
+        info += (f"\n$L$ = {LUMI_FB:g} fb$^{{-1}}$"
+                 f"\n$\\sigma_{{\\rm gen}}$ = {run['sigma']:.3g} nb"
+                 f"\n$N_{{\\rm gen}}$ = {run['N_gen']:.3g}"
+                 f"\nweight = {run['lumi_w']:.4g} / event"
+                 f"\n$N(L)$ = {H.sum():.3g}")
+        if run["N_neu"]:
+            info += "\n(leading-neutron tagged)"
+    else:
+        info += f"\n$N$ = {run['n2D'][cut]}"
+    if DROP_RADIATIVE:
+        info += ("\nno radiative tail:"
+                 f"\n$Q^2 \\geq$ {Q2_GEN_MIN:g} GeV$^2$, "
+                 rf"$x_B \leq$ {XB_MAX_PHYS:g}")
+    if cut:
+        info += "\n" + cut_text(run.get("theta_n_max"))
+    info_box = ax.text(0.03, 0.97, info, transform=ax.transAxes, ha="left",
+                       va="top", fontsize=6.5, zorder=8,
+                       bbox=dict(fc="white", ec="0.6", alpha=0.9))
+
+    if density:
+        # formula box directly under the info box, measured rather than at a
+        # fixed height (the info box grows with the cut list)
+        fig = ax.figure
+        fig.canvas.draw()
+        bb = info_box.get_window_extent(fig.canvas.get_renderer())
+        y_top = bb.transformed(ax.transAxes.inverted()).y0 - 0.03
+        ax.text(0.03, y_top, NORM_FORMULA, transform=ax.transAxes,
+                ha="left", va="top", fontsize=7.5, zorder=8,
+                bbox=dict(boxstyle="round", fc="white", ec="0.5", alpha=0.92))
+        ax.text(0.97, 0.86,
+                rf"$\int\mathcal{{L}}\,\mathrm{{d}}t$ = {LUMI_FB:g} fb$^{{-1}}$",
+                transform=ax.transAxes, ha="right", va="top", fontsize=8,
+                color="darkblue", zorder=8,
+                bbox=dict(boxstyle="round", fc="white", ec="darkblue",
+                          alpha=0.9))
+
+    ax.set_title(title, fontsize=10)
+
+
+DENS = (rf"$\mathrm{{d}}^2N/\mathrm{{d}}x_B\mathrm{{d}}Q^2$ / "
+        rf"{LUMI_FB:g} fb$^{{-1}}$")
+COLS = [(False, False, "(a) Events, no cuts"),
+        (True,  False, "(b) Events, after cuts"),
+        (False, True,  f"(c) {DENS}, no cuts"),
+        (True,  True,  f"(d) {DENS}, after cuts")]
+
+
+def make_row(axrow, run, with_titles=True):
+    for k, (cut, dens, title) in enumerate(COLS):
+        panel(axrow[k], run, cut, dens, title if with_titles else "")
+
+
+# the N x 4 figure (one row per beam config)
+
+nrow = len(RUNS)
+fig, axes = plt.subplots(nrow, 4, figsize=(22, 4.7 * nrow), squeeze=False)
+for i, run in enumerate(RUNS):
+    make_row(axes[i], run)
+fig.suptitle(r"$Q^2$ vs $x_B$", fontsize=17)
+fig.tight_layout(rect=[0.022, 0, 1, 1 - 0.025 / nrow])
+fig.canvas.draw()
+for i, run in enumerate(RUNS):           # beam config down the left edge
+    p0 = axes[i][0].get_position()
+    fig.text(0.006, p0.y0 + 0.5 * p0.height, run["label"], rotation=90,
+             va="center", ha="left", fontsize=15)
+out = f"{OUTDIR}/Q2_vs_xB_{nrow}x4.png"
+fig.savefig(out)
+fig.savefig(out.replace(".png", ".pdf"))
+plt.close(fig)
+print(f"\n[out] {out}")
+
+# one 1x4 figure per beam config
+
+if MAKE_PER_ENERGY_ROW:
+    for run in RUNS:
+        fig, axes = plt.subplots(1, 4, figsize=(22, 4.9), squeeze=False)
+        make_row(axes[0], run)
+        fig.suptitle(rf"$Q^2$ vs $x_B$   —   {run['label']}", fontsize=16)
+        fig.tight_layout(rect=[0, 0, 1, 0.94])
+        out = f"{OUTDIR}/Q2_vs_xB_1x4_{run['tag']}.png"
+        fig.savefig(out)
+        fig.savefig(out.replace(".png", ".pdf"))
+        plt.close(fig)
+        print(f"[out] {out}")
+
+# dsigma/dx_L  =  (sigma_gen / N_NORM) * (dN / dx_L)
+# x_L in [0,1], bin width XL_DELTA. Exact (pass-1) counts, no cuts and
+# after cuts.
+
+XL_CENTERS = 0.5 * (XL_EDGES[:-1] + XL_EDGES[1:])
+XL_WIDTH = np.diff(XL_EDGES)   # all XL_DELTA
+
+# dsigma/dx_L  =  (sigma_gen / N_NORM) * (dN / dx_L)
+# x_L in [0,1], bin width XL_DELTA, after cuts. One plot, all beam configs
+# overlaid.
+
+XL_CENTERS = 0.5 * (XL_EDGES[:-1] + XL_EDGES[1:])
+XL_WIDTH = np.diff(XL_EDGES)   # all XL_DELTA
+
+fig, ax = plt.subplots(figsize=(7.5, 5.5))
+for run in RUNS:
+    dN = run["xL_H"][True]                          # after cuts
+    dsigma_dxL = (run["sigma"] / N_NORM) * (dN / XL_WIDTH)
+    _th = run.get("theta_n_max", THETA_N_MAX_MRAD)
+    ax.step(XL_EDGES, np.append(dsigma_dxL, dsigma_dxL[-1]), where="post",
+            color=run["color"], lw=1.8,
+            label=(f"{run['label'].replace(' GeV', '')}"
+                   rf"  ($\theta_n<{_th:g}$ mrad)"))
+
+ax.set_xlabel(r"$x_L$", fontsize=20, fontweight="bold", labelpad=10)
+ax.set_ylabel(r"$\mathrm{d}\sigma/\mathrm{d}x_L$ [nb]", fontsize=20,
+             fontweight="bold", labelpad=12)
+ax.set_xlim(0.3, 1)
+ax.set_yscale("log")
+ax.tick_params(axis="both", which="major", labelsize=16, length=8, width=1.6)
+ax.tick_params(axis="both", which="minor", length=4, width=1.2)
+# theta_n is per curve (in the entries), so the shared title carries only the
+# cuts that every curve has in common
+XL_LEGEND_TITLE = (r"$135^\circ<\theta_{e'}<178^\circ$" "\n"
+                   r"$E_{e'}>1$ GeV" "\n"
+                   + rf"${Q2_LIM[0]:g}<Q^2<{Q2_LIM[1]:g}$ GeV$^2$")
+leg = ax.legend(fontsize=13, title=XL_LEGEND_TITLE, title_fontsize=13)
+bold_legend(leg)
+bold_ticks(ax)
+fig.tight_layout()
+out = f"{OUTDIR}/dsigma_dxL.png"
+fig.savefig(out)
+fig.savefig(out.replace(".png", ".pdf"))
+plt.close(fig)
+print(f"[out] {out}")
+
+# 1D comparison overlays: one figure per observable, every file on top
+# (pass 2 -- only run if actually needed, and only re-reads the files once)
+
+EDGE_JOBS = {}
+
+
+def compare(key, cut, outdir, xscale=None, yscale=None, filename=None):
+    logx = OBS[key][1] if xscale is None else (xscale == "log")
+    logy = True if yscale is None else (yscale == "log")
+    edges = EDGE_JOBS.get((key, cut, logx))
+    if edges is None:
+        return
+    fig, ax = plt.subplots(figsize=(7.5, 5.5))
+    any_data = False
+    for run in RUNS:
+        h = run.get("hist1d", {}).get((key, cut, logx))
+        if h is None or h.sum() <= 0:
+            continue
+        hh = h.copy()
+        if COMPARE_MODE == "lumi":
+            hh = hh * run["lumi_w"]
+        elif COMPARE_MODE == "shape":
+            hh = hh / max(hh.sum(), 1e-30)
+        _th = run.get("theta_n_max", THETA_N_MAX_MRAD)
+        _lbl = (rf"{run['label']}  ($\theta_n<{_th:g}$ mrad, "
+                rf"$N$ = {h.sum():.4g})" if cut
+                else f"{run['label']}  ($N$ = {h.sum():.4g})")
+        ax.stairs(hh, edges, color=run["color"], lw=1.8, label=_lbl)
+        any_data = True
+    if not any_data:
+        plt.close(fig)
+        return
+    ax.set_xlabel(OBS[key][0])
+    ax.set_ylabel(YLAB)
+    ax.set_xscale("log" if logx else "linear")
+    ax.set_yscale("log" if logy else "linear")
+    leg = ax.legend(fontsize=9, loc="best")
+    bold_legend(leg)
+    bold_ticks(ax)
+    if cut:
+        ax.text(0.02, 0.02, CUT_TEXT, transform=ax.transAxes, ha="left",
+                va="bottom", fontsize=8, color="firebrick")
+    ax.set_title("after cuts" if cut else "no cuts", fontsize=11)
+    fig.tight_layout()
+    png_name = filename or f"{key}.png"
+    fig.savefig(os.path.join(outdir, png_name))
+    fig.savefig(os.path.join(outdir, os.path.splitext(png_name)[0] + ".pdf"))
+    plt.close(fig)
+
+
+if MAKE_COMPARISONS:
+    EDGE_JOBS = build_edge_jobs()
+    RUNS = [load_pass2(r, EDGE_JOBS) for r in RUNS]
+
+    for cut, sub in [(False, "compare_nocuts"), (True, "compare_cuts")]:
+        d = os.path.join(OUTDIR, sub)
+        os.makedirs(d, exist_ok=True)
+        for key in OBS:
+            compare(key, cut, d)
+        print(f"[out] {d}/  ({len(OBS)} observables, {len(RUNS)} files each)")
+
+    # extra Q2 axis-scale variants
+    for cut, sub in [(False, "compare_nocuts"), (True, "compare_cuts")]:
+        d = os.path.join(OUTDIR, sub)
+        for key, variants in EXTRA_SCALE_VARIANTS.items():
+            for xscale, yscale, fname in variants:
+                compare(key, cut, d, xscale=xscale, yscale=yscale,
+                        filename=fname)
+                print(f"[out] {d}/{fname}")
+
+print(f"\nDone -> ./{OUTDIR}/")

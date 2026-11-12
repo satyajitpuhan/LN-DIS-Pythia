@@ -1,0 +1,10 @@
+H1 data vs. Pythia setting + Sullivan with JAM21 (bin averaged), chi^2/N
+========================================================================
+
+PDF set                                            chi2        N       chi2/N
+-----------------------------------------------------------------------------
+Pythia default + JAM21                         554.2911      203       2.7305
+CT18 NLO + JAM21                               589.8425      203       2.9056
+CT18 NLO + Remnant + JAM21                     779.0865      203       3.8379
+CT18 NLO + Tuning + JAM21                     2434.7472      203      11.9938
+CT18 NLO + Gluon + JAM21                       493.0891      203       2.4290

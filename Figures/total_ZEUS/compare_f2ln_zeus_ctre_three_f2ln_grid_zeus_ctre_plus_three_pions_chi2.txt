@@ -1,0 +1,8 @@
+ZEUS data vs. CT18NLO + Remnant + Sullivan (bin averaged), chi^2/N
+==================================================================
+
+PDF set                                            chi2        N       chi2/N
+-----------------------------------------------------------------------------
+Pythia (CT18NLO + Remnant) + JAM21            3177.0041      288      11.0313
+Pythia (CT18NLO + Remnant) + xFitter          8678.7645      288      30.1346
+Pythia (CT18NLO + Remnant) + GRV              4753.4647      288      16.5051
