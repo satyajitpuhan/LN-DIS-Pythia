@@ -53,14 +53,6 @@ Figures: go to the folder and run the script, for example
     cd Figures/total_H1
     python3 ct18_three_pions.py
 
-The Pythia histograms in the H1 and ZEUS bins and the bin averaged Sullivan term are included
-(Figures/inputs), so all figures except Figs. 8 and 12-16 run without the ROOT files; the
-H1 and ZEUS grids take a few seconds and less than 1.5 GB of memory. The fit of the cutoff takes about 15 s, Fig. 3 about 30 s.
-The first run of lambda_fit and data_over_theory computes the JAM21 replica mean on a fine x
-grid and keeps it in Figures/cache; this takes much longer, the next runs are fast. Making
-the bin averaged Sullivan term again (Figures/inputs/sullivan_binavg) takes about 20 minutes
-per pion PDF at most.
-
 | folder in Figures | figure in the paper |
 |---|---|
 | pion_flux | 2 |

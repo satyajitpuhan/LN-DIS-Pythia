@@ -51,8 +51,7 @@ Run lambda_fit first if you want to redo the fit; pion_flux and data_over_theory
 results (lambda_fit_results.csv is included). The other figures can be made in any order.
 
 The grid figures (Figs. 9-11 and 20-25) take the Pythia part from inputs/pythia_histograms
-and the Sullivan part from inputs/sullivan_binavg, so they only take a few seconds. The
-Sullivan term there is averaged over each (x_B, Q^2) bin on 12 x 12 points (equal steps in
+and the Sullivan part from inputs/sullivan_binavg. The Sullivan term there is averaged over each (x_B, Q^2) bin on 12 x 12 points (equal steps in
 ln x_B and ln Q^2, points with y > 1 left out); for H1 it is also averaged over 12 points in
 each x_L bin. To make these inputs again:
 
@@ -65,10 +64,6 @@ each x_L bin. To make these inputs again:
 Figs. 8 and 12-16 and inputs/pythia_histograms/make_pythia_histograms.py read the Pythia
 ROOT files (about 50 GB each, not included). Make them with the codes in ../Pythia; by default
 the scripts look for them in ../Pythia/output, or set PYTHIA_OUT.
-
-The first run of lambda_fit, data_over_theory and the input scripts computes the JAM21
-replica mean on a fine x grid for every Q^2 needed and keeps it in cache/, so the first run
-takes much longer than the next ones.
 
 ## Requirements
 
