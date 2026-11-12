@@ -74,4 +74,5 @@ takes much longer than the next ones.
 
 Python 3 with numpy, scipy, matplotlib and the LHAPDF python module, with the sets
 JAM21PionPDFnlo, xFitterPI_NLO_VAR, GRVPI1 and CT18NLO. uproot is needed only to read the
-Pythia ROOT files. If cupy is installed, F2 of the pion is computed on the GPU.
+Pythia ROOT files. If cupy is installed, F2 of the pion is computed on the GPU; all our
+calculations were done on an NVIDIA GeForce RTX 5080 (16 GB, CUDA 13.2).

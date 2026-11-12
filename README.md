@@ -27,8 +27,8 @@ The versions we used are given in brackets.
 - Python 3 (3.14) with numpy (2.4), scipy (1.17), matplotlib (3.10) and the LHAPDF python
   module
 - uproot (5.7), only to read the Pythia ROOT files
-- optional: cupy (14.1) to compute F2 of the pion on the GPU, PyMuPDF to crop the PDF of the
-  fit table
+- optional: an NVIDIA GPU with cupy (14.1) to compute F2 of the pion on the GPU (we used an
+  NVIDIA GeForce RTX 5080), PyMuPDF to crop the PDF of the fit table
 
 ## Hardware
 
