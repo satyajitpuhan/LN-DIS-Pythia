@@ -30,6 +30,13 @@ The versions we used are given in brackets.
 - optional: cupy (14.1) to compute F2 of the pion on the GPU, PyMuPDF to crop the PDF of the
   fit table
 
+## Hardware
+
+All calculations of this work (F2 of the pion, the Sullivan term, the bin averages, the fits
+and the figures) were done with cupy on an NVIDIA GeForce RTX 5080 GPU (16 GB, CUDA 13.2).
+Without cupy the same code runs on the CPU, only slower. The Pythia samples were generated
+on the CPU.
+
 ## How to run
 
 Pythia samples (only needed for Figs. 8 and 12-16, or to remake the Pythia histograms):
