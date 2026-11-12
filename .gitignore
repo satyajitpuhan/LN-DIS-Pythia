@@ -1,0 +1,7 @@
+# binaries built by make
+*/*/dis_h1
+*/*/dis_zeus
+*/*/dis_eic
+# generator output
+*.root
+*_sigma.txt
