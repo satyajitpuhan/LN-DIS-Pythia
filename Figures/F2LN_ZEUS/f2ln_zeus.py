@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """ZEUS F2^LN against x_pi with the JAM21, xFitter and GRV Sullivan terms and their PDF
 uncertainties (Fig. 6). The data points are r / Delta x_L times F2^p from CT18NLO.
 """
@@ -38,7 +37,7 @@ os.environ.setdefault("LHAPATH", LOCAL_LHAPDF_DATA)
 
 import lhapdf
 
-# GPU backend (CuPy) with automatic CPU fallback.
+# GPU backend (CuPy) with automatic CPU fallback
 try:
     import cupy as xp
     GPU = True
@@ -63,7 +62,7 @@ plt.rcParams.update(
         "font.serif": ["Times New Roman", "DejaVu Serif"],
         "font.weight": "bold",
         "mathtext.fontset": "dejavuserif",
-        "mathtext.default": "bfit",   # bold *italic* math (variables stay italic)
+        "mathtext.default": "bfit",
         "pdf.fonttype": 42,
         "ps.fonttype": 42,
         "axes.linewidth": 1.4,
@@ -106,12 +105,6 @@ LAMBDA = 1.31
 X_FINE = np.logspace(-6, np.log10(1.0 - 1e-8), 5000)
 PIDS_NEEDED = [1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 21]
 
-# Fixed-order Gauss-Legendre quadrature nodes/weights on [-1, 1], used to
-# replace the original's adaptive scipy.integrate.quad. N_QUAD is generous
-# headroom since raising it is essentially free on GPU; the z -> 1 endpoint
-# is analytically regulated (the "+"-distribution (fz - fx) terms vanish
-# there), so this is resolving a finite but slowly-converging log tail, not
-# a true divergence.
 N_QUAD = 200
 _GL_NODES_CPU, _GL_WEIGHTS_CPU = np.polynomial.legendre.leggauss(N_QUAD)
 GL_NODES = to_gpu(_GL_NODES_CPU)
@@ -124,11 +117,9 @@ PDF_SPECS = [
     ("GRV",     "GRVPI1",             "forestgreen", ":",  False),
 ]
 
-# Extra line width added to the GRV curve (it has no band, so it needs to be
-# thicker to stand out). Raise this number to make GRV even bolder.
 GRV_EXTRA_LW = 1.4
 
-# Proton PDF used to compute F2^p at the ZEUS (x, Q2) points.
+# Proton PDF used to compute F2^p at the ZEUS (x, Q2) points
 PROTON_PDF_NAME = "CT18NLO"
 PROTON_PDF = lhapdf.mkPDF(PROTON_PDF_NAME, 0)
 
@@ -136,10 +127,9 @@ F2P_TABLE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", 
 CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "f2ln_zeus_curves.npz")
 
 
-# NLO structure-function machinery -- GPU, vectorized over an x array
-# for one PDF member at one Q^2 at a time.
+# NLO structure-function machinery
 def _build_pdf_grid_cpu(pdf, q2val):
-    """The one unavoidably-CPU step: query LHAPDF on the fixed X_FINE grid."""
+    """Query LHAPDF on the fixed X_FINE grid (CPU)."""
     qval = np.sqrt(q2val)
     return {
         pid: np.array([pdf.xfxQ(pid, float(xx), qval) for xx in X_FINE])
@@ -148,9 +138,6 @@ def _build_pdf_grid_cpu(pdf, q2val):
 
 
 class GpuPdfGrid:
-    """Tabulates one member's PDF grid at one Q^2 (CPU, via LHAPDF) and
-    interpolates xfQ(pid, x) for arbitrary (batched) x arrays on the GPU.
-    """
 
     def __init__(self, pdf, q2val):
         grids_cpu = _build_pdf_grid_cpu(pdf, q2val)
@@ -167,9 +154,7 @@ class GpuPdfGrid:
 
 
 def f2_nlo_vec(pdf, grid, x_arr_cpu, q2val):
-    """Vectorized NLO F2 across all x in x_arr_cpu (numpy 1D) for one PDF
-    member at one Q^2. Returns a numpy array of the same length.
-    """
+    """Vectorized NLO F2 across all x in x_arr_cpu (numpy 1D) for one PDF member at one Q^2."""
     x_arr = to_gpu(np.asarray(x_arr_cpu, dtype=np.float64))
     n_x = x_arr.shape[0]
 
@@ -179,7 +164,7 @@ def f2_nlo_vec(pdf, grid, x_arr_cpu, q2val):
 
     half_width = (zmax - x_arr) / 2.0
     mid = (zmax + x_arr) / 2.0
-    z = mid[:, None] + half_width[:, None] * GL_NODES[None, :]   # (n_x, N)
+    z = mid[:, None] + half_width[:, None] * GL_NODES[None, :]  # (n_x, N)
     w = GL_WEIGHTS[None, :]
     jac = half_width[:, None]
 
@@ -245,9 +230,6 @@ def f2_nlo_vec(pdf, grid, x_arr_cpu, q2val):
 
 
 def f2p_ct18_batch(x_arr, q2_arr):
-    """F2^p(x, Q2) at NLO from CT18NLO for arrays of (x, Q2) pairs, batched
-    per unique Q2 value (one GPU pass per unique Q2 across all matching x's).
-    """
     x_arr = np.asarray(x_arr, dtype=np.float64)
     q2_arr = np.asarray(q2_arr, dtype=np.float64)
     out = np.empty_like(x_arr)
@@ -345,18 +327,13 @@ def all_members(pset):
 
 
 def build_band(pset, curves):
-    """(central, lo, hi) per x, dispatching on error type.
-    replicas/(sym)hessian -> LHAPDF's prescription; variations -> envelope.
-    """
+    """(central, lo, hi) per x, dispatching on error type."""
     n = curves.shape[1]
     central = np.empty(n); lo = np.empty(n); hi = np.empty(n)
     if pset.errorType == "variations":
         for j in range(n):
             col = curves[:, j]
             lo[j] = col.min(); hi[j] = col.max()
-            # band midpoint as the plotted central (not member 0), so the
-            # xFitter dashed line sits centered in its envelope instead of
-            # hugging one edge.
             central[j] = 0.5 * (lo[j] + hi[j])
     else:
         for j in range(n):
@@ -368,8 +345,6 @@ def build_band(pset, curves):
 
 
 def _f2pi_curve(pdf, q2v, xpi_grid):
-    # One CPU LHAPDF-grid tabulation for this member+Q2, then one batched
-    # GPU pass over the whole xpi_grid (no per-x Python/quad loop).
     grid = GpuPdfGrid(pdf, float(q2v))
     return f2_nlo_vec(pdf, grid, xpi_grid, float(q2v))
 
@@ -451,18 +426,14 @@ from matplotlib.ticker import (FuncFormatter, AutoMinorLocator,
 
 
 def _bold_log_fmt(v, pos):
-    r"""Bold power-of-ten x labels, every 2 decades. Odd exponents are used
-    (10^-3, 10^-1) so no label sits on the panel edge -- with wspace=0 an
-    edge label would collide with the neighbouring panel's.
-    Tick labels are mathtext, so bold must come from \mathbf.
-    """
+    """Bold power-of-ten x labels, every 2 decades."""
     if v <= 0.0:
         return ""
     exp = int(round(np.log10(v)))
     if abs(v - 10.0 ** exp) > 1e-6 * 10.0 ** exp:
-        return ""            # minor tick between decades -> no label
+        return ""  # minor tick between decades -> no label
     if exp % 2 == 0:
-        return ""            # label every other decade, odd exponents only
+        return ""
     return rf"$\mathbf{{10^{{{exp}}}}}$"
 
 
@@ -477,25 +448,22 @@ def _bold_ticklabels(ax):
 
 
 # Layout constants for the gapless panel grid (inches)
-PANEL_IN = 2.7      # side of each square panel
-MARG_L   = 1.95     # room for y-axis label, y tick labels, x_L row labels
+PANEL_IN = 2.7  # side of each square panel
+MARG_L   = 1.95
 MARG_R   = 0.18
-MARG_B   = 1.15     # room for x tick labels + x-axis label
-MARG_T   = 0.65     # room for the Q^2 column titles
+MARG_B   = 1.15  # room for x tick labels + x-axis label
+MARG_T   = 0.65  # room for the Q^2 column titles
 
-# Font sizes. Everything is bold (tick labels via the \mathbf formatters).
-FS_AXLABEL = 26     # F_2^LN and x_pi axis labels
-FS_TITLE   = 23     # Q^2 column titles
-FS_ROWLAB  = 23     # x_L row labels
+FS_AXLABEL = 26  # F_2^LN and x_pi axis labels
+FS_TITLE   = 23  # Q^2 column titles
+FS_ROWLAB  = 23  # x_L row labels
 FS_LEGEND  = 12
-FS_ACC     = 16     # the "NLO" accuracy tag
+FS_ACC     = 16  # the "NLO" accuracy tag
 
 
 def make_figure(mode, zeus, q2_vals, xl_vals, xpi_grid,
                 MEMBER0, CENTRAL, LO, HI, outbase):
-    """mode = 'member0' or 'band'. Overlays all sets in PDF_SPECS.
-    Rows run from the HIGHEST x_L (top) to the lowest (bottom).
-    """
+    """mode = 'member0' or 'band'."""
     xl_vals = sorted([float(x) for x in xl_vals], reverse=True)
     nrows = len(xl_vals)
     ncols = len(q2_vals)
@@ -507,8 +475,6 @@ def make_figure(mode, zeus, q2_vals, xl_vals, xpi_grid,
         sharex=True, sharey=True, facecolor="white",
         gridspec_kw=dict(wspace=0.0, hspace=0.0),
     )
-    # Panels butt directly against each other; margins are absolute inches so
-    # every axes box comes out exactly PANEL_IN x PANEL_IN (square, no gaps).
     fig.subplots_adjust(
         left=MARG_L / fig_w, right=1.0 - MARG_R / fig_w,
         bottom=MARG_B / fig_h, top=1.0 - MARG_T / fig_h,
@@ -529,7 +495,7 @@ def make_figure(mode, zeus, q2_vals, xl_vals, xpi_grid,
             ax.set_facecolor("white")
 
             for label, set_name, color, ls, has_band in PDF_SPECS:
-                # GRV has no band and is dotted, so draw it noticeably thicker.
+                # GRV has no band and is dotted, so draw it noticeably thicker
                 extra = GRV_EXTRA_LW if label == "GRV" else 0.0
                 if mode == "member0":
                     ax.plot(xpi_grid, flux_val * MEMBER0[label][q2v],
@@ -557,17 +523,9 @@ def make_figure(mode, zeus, q2_vals, xl_vals, xpi_grid,
             ax.set_xscale("log")
             ax.set_xlim(float(xpi_grid[0]), float(xpi_grid[-1]))
             ax.set_ylim(0.0, 0.25)
-            # Drop the 0.00 / 0.25 ticks: with hspace=0 an end label would run
-            # into the panel above/below.
             ax.set_yticks([0.05, 0.10, 0.15, 0.20])
             ax.yaxis.set_minor_locator(AutoMinorLocator())
 
-            # Be explicit about the log-x ticking: a major tick on every
-            # decade (the formatter then labels only 10^-3 and 10^-1) and
-            # 2..9 sub-decade minors, unlabelled. The default LogLocator
-            # uses numticks="auto", which on a narrow panel can stride by 2
-            # decades and land only on the EVEN exponents -- every one of
-            # which the formatter blanks, leaving no x labels at all.
             ax.xaxis.set_major_locator(LogLocator(base=10.0, numticks=12))
             ax.xaxis.set_minor_locator(
                 LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1, numticks=12)
@@ -584,14 +542,10 @@ def make_figure(mode, zeus, q2_vals, xl_vals, xpi_grid,
                 ax.set_title(rf"$Q^2={q2v:g}\ \mathrm{{GeV}}^2$",
                              fontsize=FS_TITLE, fontweight="bold", pad=8)
             if j == 0:
-                # Rotated to run vertically alongside the row, like a second
-                # y-axis label -- keeps the left margin narrow.
                 ax.text(-0.33, 0.5, rf"$x_L={xl:.2f}$", transform=ax.transAxes,
                         va="center", ha="center", rotation=90,
                         fontsize=FS_ROWLAB, fontweight="bold")
 
-    # Axis labels (NO overall header) -- placed in absolute figure fractions so
-    # they track the margins above.
     fig.text(0.18 / fig_w, MARG_B / fig_h + 0.5 * (1.0 - (MARG_B + MARG_T) / fig_h),
              r"$F_2^{LN}(x_\pi,Q^2,x_L)$", va="center", ha="left",
              rotation="vertical", fontsize=FS_AXLABEL, fontweight="bold")
@@ -599,7 +553,6 @@ def make_figure(mode, zeus, q2_vals, xl_vals, xpi_grid,
              r"$x_{\pi}$", ha="center", va="bottom",
              fontsize=FS_AXLABEL, fontweight="bold")
 
-    # Legend in the FIRST panel.
     handles = [Line2D([0], [0], marker="o", color="black", lw=0, ms=7,
                       mfc="black", label="ZEUS data")]
     for label, set_name, color, ls, has_band in PDF_SPECS:
@@ -616,7 +569,6 @@ def make_figure(mode, zeus, q2_vals, xl_vals, xpi_grid,
     print(f"Saved {outbase}.png/.pdf")
 
 
-# MAIN
 def main():
     zeus = load_zeus()
     q2_vals = np.unique(zeus["q2"])
@@ -634,9 +586,6 @@ def main():
     else:
         MEMBER0, CENTRAL, LO, HI = loaded
 
-    # Center the xFitter dashed line inside its band (variations-type sets):
-    # derive the plotted central from the cached lo/hi envelope midpoint.
-    # Works with an existing cache without forcing a recompute.
     for label, set_name, color, ls, has_band in PDF_SPECS:
         if not has_band:
             continue
@@ -648,8 +597,6 @@ def main():
         except Exception:
             pass
 
-    # Drop unwanted rows / column from the PLOT only
-    # (computation & cache stay over the full grid, so no recompute needed).
     REMOVE_XL = [0.24, 0.31, 0.43, 0.67, 0.79]
 
     def _removed_xl(x):

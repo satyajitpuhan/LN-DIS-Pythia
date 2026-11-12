@@ -15,7 +15,7 @@ matplotlib.rcParams.update({
     "font.serif"         : ["Times New Roman", "DejaVu Serif"],
     "font.weight"        : "bold",
     "mathtext.fontset"   : "dejavuserif",
-    "mathtext.default"   : "bfit",     # bold *italic* math (H1 style)
+    "mathtext.default"   : "bfit",  # bold *italic* math (H1 style)
     "axes.labelsize"     : 10,
     "axes.labelweight"   : "bold",
     "axes.titlesize"     : 8,
@@ -35,31 +35,23 @@ matplotlib.rcParams.update({
     "axes.linewidth"     : 1.4,
 })
 
-# CONSTANTS
-N_TOTAL = 500_000_000          # N_generated: 5x10^8 events, same for all 4 runs
+N_TOTAL = 500_000_000
 
-# Number of tree entries read into memory at once. Keeps peak RAM bounded
-# regardless of how many total events (500M) are in the file, so large
-# ROOT files can be processed without exhausting WSL's memory.
 CHUNK_SIZE = 2_000_000
 
-# -- Colours (matches h1zeus.py's palette) --------------------
-C_DEFAULT      = "#1f77b4"    # blue    - default PDF
-C_CT18         = "#d62728"    # red     - CT18 NLO (thick, solid)
-C_CT18_REMNANT = "#9467bd"    # purple  - CT18 NLO + Remnant
-C_CT18_PTUNE   = "#ff7f0e"    # orange  - CT18NLO+pythia Tune
-C_CT18_GLUON   = "#17becf"    # cyan    - CT18 + gluon
+C_DEFAULT      = "#1f77b4"  # blue
+C_CT18         = "#d62728"  # red
+C_CT18_REMNANT = "#9467bd"  # purple
+C_CT18_PTUNE   = "#ff7f0e"  # orange
+C_CT18_GLUON   = "#17becf"  # cyan
 C_DATA         = "black"
 
-# House-style font sizes, identical to h1zeus.py.
-FS_AXLABEL = 26     # x_L and dsigma/dx_L axis labels
-FS_TICK    = 17     # x and y tick numbers
-FS_LEGEND  = 12     # curve legend
+FS_AXLABEL = 26  # x_L and dsigma/dx_L axis labels
+FS_TICK    = 17  # x and y tick numbers
+FS_LEGEND  = 12  # curve legend
 
-# Stroke widths used to make text heavier at the SAME font size ('bold' is
-# already the max weight, so extra weight must come from the outline).
-TICK_LABEL_STROKE = 0.6      # Q^2 titles, x_B row labels, numeric ticks
-AXIS_LABEL_STROKE = 1.1      # the big x_L / F_2^{LN} axis labels
+TICK_LABEL_STROKE = 0.6
+AXIS_LABEL_STROKE = 1.1  # the big x_L / F_2^{LN} axis labels
 
 
 def _stroke(*artists, width=TICK_LABEL_STROKE):
@@ -78,18 +70,9 @@ def bold_ticklabels(ax, width=TICK_LABEL_STROKE):
         _stroke(t, width=width)
 
 C_MC   = C_DEFAULT
-C_SUM  = C_CT18            # Pythia + JAM21 (direct sum, no normalization)
+C_SUM  = C_CT18
 
 # Multiple Pythia ROOT files (5 total)
-# Each entry: (path, label, color, linestyle, linewidth) for its
-# "Pythia+JAM21" curve. Colours/styles follow h1zeus.py's palette:
-#   default.root        -> C_DEFAULT      (blue,   solid)
-#   ct18defaultnlo.root -> C_CT18         (red,    thick solid)
-#   ct18remantnlo.root  -> C_CT18_REMNANT (purple, dotted)
-#   ct18dtuningnlo.root -> C_CT18_PTUNE   (orange, dashed)
-#   ct18gluon.root      -> C_CT18_GLUON   (cyan,   dashdot)
-# Paths below are the WSL/Linux-side equivalents of the given Windows
-# UNC paths ("\\wsl.localhost\Ubuntu\..." -> "/...").
 PYTHIA_FILES = [
     dict(path=os.path.join(PYTHIA_OUT, "zeus_default.root"),
          label="Pythia default",
@@ -111,26 +94,22 @@ PYTHIA_FILES = [
 ALPHA      = 1.0 / 137.036
 GEV2_TO_NB = 0.3893793656e6
 E_E        = 27.5
-E_P        = 820.0             # ZEUS 1995-97 running (paper: sqrt(s)~300 GeV), NOT the
-                                # HERA-II 920 GeV used for the H1/920 comparison
-S          = 4.0 * E_E * E_P   # 90 200 GeV^2 -- confirmed against zeus.root's "s" branch
+E_P        = 820.0
+S          = 4.0 * E_E * E_P  # 90 200 GeV^2
 
-# ZEUS cuts (as specified)
-EePrime_MIN  = 10.0                    # E_e' > 10 GeV
-THETA_N_MAX  = 0.8e-3                  # theta_n  < 0.8 mrad
-PT_COEFF     = 0.656                   # neutron p_T acceptance: p_T < 0.656 * x_L [GeV]
-# NOTE: explicitly NO y cut, NO W^2 cut, NO electron-angle cut.
+# ZEUS cuts
+EePrime_MIN  = 10.0  # E_e' > 10 GeV
+THETA_N_MAX  = 0.8e-3  # theta_n  < 0.8 mrad
+PT_COEFF     = 0.656
 
-# x_L binning (ZEUS, 12 bins, matches zeus.dat centres)
 XL_EDGES = np.array([0.20, 0.28, 0.34, 0.40, 0.46, 0.52, 0.58,
                       0.64, 0.70, 0.76, 0.82, 0.88, 1.00])
 XL_CTRS  = 0.5 * (XL_EDGES[:-1] + XL_EDGES[1:])
 XL_XERR  = 0.5 * (XL_EDGES[1:]  - XL_EDGES[:-1])
 XL_BWS   = XL_EDGES[1:] - XL_EDGES[:-1]
-N_XL     = len(XL_CTRS)        # 12
+N_XL     = len(XL_CTRS)
 
-# ZEUS Q^2 bins (8 columns, image 2)
-# (Q2_nominal, Q2_lo, Q2_hi)
+# ZEUS Q^2 bins (8 columns)
 Q2_BINS_ZEUS = [
     (7.0,    4.0,    10.0),
     (15.0,   10.0,   20.0),
@@ -142,10 +121,6 @@ Q2_BINS_ZEUS = [
     (1000.0, 640.0,  10000.0),
 ]
 
-# ---- ZEUS x_BJ bins (7 rows, SAME range used for every Q^2 column) --
-# (x_nominal, x_lo, x_hi) - verified against image 2: each x_nominal
-# always carries the same [x_lo,x_hi] range no matter which Q^2 row it
-# appears in, so one fixed set of 7 x ranges applies across all columns.
 X_BINS_ZEUS = [
     (1.1e-4, 8.0e-5, 1.5e-4),
     (2.1e-4, 1.5e-4, 3.0e-4),
@@ -156,8 +131,8 @@ X_BINS_ZEUS = [
     (32.e-3, 1.0e-2, 1.0e-1),
 ]
 
-NQ_ZEUS = len(Q2_BINS_ZEUS)     # 8
-NX_ZEUS = len(X_BINS_ZEUS)      # 7   -> full 7x8 = 56-panel grid
+NQ_ZEUS = len(Q2_BINS_ZEUS)
+NX_ZEUS = len(X_BINS_ZEUS)  # 7   -> full 7x8 = 56-panel grid
 
 
 # JAM21 pion PDF (NLO F2^pi) + leading-neutron flux
@@ -325,14 +300,6 @@ def flux(x_l_val):
 
 
 def compute_all_jam21_f2ln_zeus(pdf):
-    """Same full 7(x) x 8(Q2) rectangular grid as compute_all_pythia_f2ln_zeus,
-    but F_2LN(x_L) here comes from the JAM21 pion PDF convolved with the
-    leading-neutron flux:  F_2LN(x_L) = 2 * f_{pi/N}(x_L) * F_2^pi(x_pi,Q2),
-    with x_pi = x_BJ / (1 - x_L), evaluated at the center of each x_L bin
-    and drawn as a flat (stairs) curve across that bin, exactly like the
-    Pythia histogram curves.
-    Returns dict (iq, ix) -> f2ln array[N_XL] (NaN where x_pi >= 1).
-    """
     f2ln_jam = {}
     for iq, (q2_nom, q2lo, q2hi) in enumerate(Q2_BINS_ZEUS):
         for ix, (x_nom, xlo, xhi) in enumerate(X_BINS_ZEUS):
@@ -351,15 +318,10 @@ def compute_all_jam21_f2ln_zeus(pdf):
 
 def load_f2p_table(filename=F2P_TABLE_FILE):
     table = np.loadtxt(filename)
-    return table[:, 0], table[:, 1], table[:, 2]   # x, Q2, F2p(CT18NLO)
+    return table[:, 0], table[:, 1], table[:, 2]  # x, Q2, F2p(CT18NLO)
 
 
 def match_f2p(x_query, q2_query, x_table, q2_table, f2p_table):
-    """Map each ZEUS-row (x,Q2) onto the corresponding F2p_CT18NLO value
-    from F2p_CT18NLO_values.txt. Tries a direct row-order match first
-    (fast path, valid when the txt file was generated from this exact
-    zeus.dat); falls back to a per-row (x,Q2) lookup otherwise.
-    """
     x_query, q2_query = np.asarray(x_query), np.asarray(q2_query)
     if (len(x_query) == len(x_table)
             and np.allclose(x_query, x_table, rtol=1e-6)
@@ -415,13 +377,7 @@ def dsig_to_f2ln(dsig_per_xl, x, Q2, dx, dQ2):
     return np.asarray(dsig_per_xl, dtype=float) / denom
 
 
-# PYTHIA (ROOT file) - ZEUS cuts, ZEUS binning
 def load_pythia(path):
-    """Streams the tree in CHUNK_SIZE-entry batches instead of pulling every
-    branch fully into memory. This keeps peak RAM bounded no matter how
-    large the file is (these runs have 5x10^8 events each), so reading
-    them can't exhaust WSL's memory or force an OOM kill.
-    """
     import uproot
 
     with uproot.open(path, object_cache=None, array_cache=None) as f:
@@ -512,13 +468,8 @@ def load_pythia(path):
 
 
 def compute_all_pythia_f2ln_zeus(data):
-    """For every cell of the FULL 7(x) x 8(Q2) rectangular grid, compute
-    F_2LN from Pythia dsigma/dx_L - regardless of whether ZEUS actually
-    published a data point there.
-    Returns dict (iq, ix) -> (f2ln array[N_XL], n_events)
-    """
     sigma_dis = data["sigma_dis"]
-    counts    = data["counts"]        # shape (NQ_ZEUS, NX_ZEUS, N_XL)
+    counts    = data["counts"]
 
     f2ln_py = {}
     nevts   = {}
@@ -539,13 +490,6 @@ def compute_all_pythia_f2ln_zeus(data):
     return f2ln_py, nevts
 
 
-# PYTHIA - ZEUS-cuts total dsigma/dx_L, RESTRICTED to the (Q2,x_B)
-# cells that actually carry a ZEUS measurement (the diagonal band in
-# the grid plot), NOT the full 56-cell rectangular grid. This reuses
-# the per-cell `counts` histogram already computed by load_pythia()
-# for the F2LN grid (no re-streaming the ROOT file), and guarantees
-# the total curve is the literal sum of the same cells shown in the
-# grid plot, so it's directly comparable to the ZEUS data total.
 def zeus_cell_mask(zeus_data):
     """Boolean (NQ_ZEUS, NX_ZEUS) mask, True for cells with ZEUS data."""
     mask = np.zeros((NQ_ZEUS, NX_ZEUS), dtype=bool)
@@ -555,18 +499,12 @@ def zeus_cell_mask(zeus_data):
 
 
 def dsigma_zeus_total_from_counts(counts, sigma_dis, cell_mask):
-    """counts: (NQ_ZEUS, NX_ZEUS, N_XL) histogram from load_pythia().
-    Sums only the masked (data-bearing) cells, converts to dsigma/dx_L.
-    """
-    total_hist = counts[cell_mask].sum(axis=0)          # -> shape (N_XL,)
+    """counts: (NQ_ZEUS, NX_ZEUS, N_XL) histogram from load_pythia()."""
+    total_hist = counts[cell_mask].sum(axis=0)  # -> shape (N_XL,)
     return sigma_dis * total_hist / N_TOTAL / XL_BWS
 
 
 def compute_all_pythia_dsigma_zeus_total(pythia_runs, cell_mask):
-    """pythia_runs: the list already built in main() for the F2LN grid -
-    each entry carries 'counts' and 'sigma_dis' from load_pythia().
-    Returns list of dicts: label, color, ls, lw, have_pythia, dsigma.
-    """
     runs = []
     for run in pythia_runs:
         dsigma = np.full(N_XL, np.nan)
@@ -579,12 +517,7 @@ def compute_all_pythia_dsigma_zeus_total(pythia_runs, cell_mask):
     return runs
 
 
-# ZEUS DATA (zeus.dat) - same recipe as histojam.py
 def load_zeus_f2ln(path, f2p_table_file=F2P_TABLE_FILE):
-    """zeus.dat columns:
-    0: xL bin index   1: xL centre   2: Q2   3: x_BJ
-    4: R_LN (%)       5: dR_LN (%)   6: F2p_ref (model A)  7: F2p_ref (model B)
-    """
     raw = np.loadtxt(path)
     x_l  = raw[:, 1]
     q2   = raw[:, 2]
@@ -601,7 +534,6 @@ def load_zeus_f2ln(path, f2p_table_file=F2P_TABLE_FILE):
     f2ln = (r / (100.0 * delta_xl)) * f2p
     f2ln_err = (dr / (100.0 * delta_xl)) * f2p
 
-    # map (Q2, x) -> (iq, ix) using the rectangular grid nominal values
     lut = {}
     for iq, (q2_nom, _, _) in enumerate(Q2_BINS_ZEUS):
         for ix, (x_nom, _, _) in enumerate(X_BINS_ZEUS):
@@ -632,10 +564,6 @@ def load_zeus_f2ln(path, f2p_table_file=F2P_TABLE_FILE):
     return out
 
 
-# PLOT - grid (rows = x_BJ index within row, cols = Q^2 groups)
-# GRID PLOTTING  (H1-style staircase: empty panels hidden, bold
-# Q^2/x_B labels, one big bold legend in the largest empty corner,
-# universal x_L / F_2^{LN} labels anchored close to the panels)
 def _q2_label_bold(lo, hi):
     return rf"$Q^2\!\in\![{lo:.4g},\,{hi:.4g}]\ \mathbf{{GeV}}^2$"
 
@@ -645,21 +573,17 @@ def _xb_label_bold(lo, hi):
 
 
 def _largest_corner_empty_block(cell_has_data, nrow, ncol):
-    """Largest fully-empty rectangle anchored at the bottom-right or
-    top-left corner (whichever is bigger) - where the legend can live
-    without covering any panel of the diagonal grid.
-    """
     def _all_empty(cells):
         return all(not cell_has_data.get(c, False) for c in cells)
 
     best = None
-    for r0 in range(nrow):               # bottom-right anchored
+    for r0 in range(nrow):  # bottom-right anchored
         for q0 in range(ncol):
             block = [(r, q) for r in range(r0, nrow) for q in range(q0, ncol)]
             if block and _all_empty(block):
                 if best is None or len(block) > best[0]:
                     best = (len(block), block)
-    for r1 in range(nrow):               # top-left anchored
+    for r1 in range(nrow):  # top-left anchored
         for q1 in range(ncol):
             block = [(r, q) for r in range(0, r1 + 1) for q in range(0, q1 + 1)]
             if block and _all_empty(block):
@@ -673,7 +597,7 @@ def _place_legend_in_empty_space(fig, axes, cell_has_data, source_ax, nrow, ncol
     if not handles:
         return
     block = _largest_corner_empty_block(cell_has_data, nrow, ncol)
-    if not block:                        # no empty corner -> top-right fallback
+    if not block:  # no empty corner -> top-right fallback
         fig.legend(handles, labels, loc="upper right",
                    prop={"weight": "bold", "size": 22}, framealpha=0.96)
         return
@@ -691,10 +615,6 @@ def _place_legend_in_empty_space(fig, axes, cell_has_data, source_ax, nrow, ncol
 
 def make_grid(pythia_runs, zeus_data, out,
               f2ln_jam=None, have_jam21=False, include_jam21=True):
-    """ZEUS (Q^2, x_B) grid in the H1 staircase style: only panels that carry a
-    ZEUS measurement are drawn (the ~diagonal band), empty panels are hidden,
-    and a single bold legend is placed in the largest empty corner.
-    """
     fig, axes = plt.subplots(NX_ZEUS, NQ_ZEUS,
                               figsize=(NQ_ZEUS * 4.4, NX_ZEUS * 4.0),
                               gridspec_kw=dict(wspace=0.05, hspace=0.08),
@@ -703,14 +623,13 @@ def make_grid(pythia_runs, zeus_data, out,
 
     jam_available = (include_jam21 and have_jam21 and f2ln_jam is not None)
 
-    # which (row, iq) panels carry a ZEUS measurement
     cell_has_data = {}
     for ix in range(NX_ZEUS):
         row = NX_ZEUS - 1 - ix
         for iq in range(NQ_ZEUS):
             cell_has_data[(row, iq)] = ((iq, ix) in zeus_data)
 
-    # first data-bearing panel (reading order) - legend handle source
+    # first data-bearing panel (reading order)
     legend_cell = None
     for row in range(NX_ZEUS):
         for iq in range(NQ_ZEUS):
@@ -767,7 +686,7 @@ def make_grid(pythia_runs, zeus_data, out,
 
             ax.tick_params(which="both", direction="in", top=True, right=True,
                            labelsize=10)
-            bold_ticklabels(ax)          # bold + stroked x/y tick numbers
+            bold_ticklabels(ax)  # bold + stroked x/y tick numbers
             ax.minorticks_on()
 
             if (row, iq) == legend_cell:
@@ -778,13 +697,12 @@ def make_grid(pythia_runs, zeus_data, out,
                 _, q2lo, q2hi = Q2_BINS_ZEUS[iq]
                 ax.set_title(_q2_label_bold(q2lo, q2hi), fontsize=13, pad=8,
                              fontweight="bold")
-                _stroke(ax.title)                     # extra-bold Q^2 label
+                _stroke(ax.title)  # extra-bold Q^2 label
 
-            # x_B label + y ticks on the left-most visible panel of this row
             if iq == first_visible_col.get(row):
                 ax.set_ylabel(_xb_label_bold(xlo, xhi), fontsize=12,
                               fontweight="bold")
-                _stroke(ax.yaxis.label)               # extra-bold x_B label
+                _stroke(ax.yaxis.label)  # extra-bold x_B label
                 ax.tick_params(labelleft=True)
             else:
                 ax.tick_params(labelleft=False)
@@ -797,7 +715,6 @@ def make_grid(pythia_runs, zeus_data, out,
         _place_legend_in_empty_space(fig, axes, cell_has_data,
                                      legend_source_ax, NX_ZEUS, NQ_ZEUS)
 
-    # universal axis labels anchored just outside the visible-panel block
     from matplotlib.transforms import Bbox
     vis = [ax for ax in axes.flat if ax.get_visible()]
     pos = [ax.get_position() for ax in vis]
@@ -827,17 +744,7 @@ def make_grid(pythia_runs, zeus_data, out,
     plt.close(fig)
 
 
-# ZEUS TOTAL PLOT - single panel, all ROOT-file curves + ZEUS data,
-# styled like dsigma_pdf_compare_detail_xl069.png (no pion PDF curve)
 def zeus_data_to_total_dsigma(zeus_data):
-    """Converts the per-cell ZEUS F_2LN data points (zeus_data, keyed by
-    (iq, ix) -> (xl_arr, f2ln_arr, err_arr)) back to dsigma/dx_L via the
-    same DIS relation used elsewhere (inverse of dsig_to_f2ln), evaluated
-    at each cell's nominal (x_B, Q2), then sums all cells landing in the
-    same x_L bin (XL_EDGES) into ONE total dsigma/dx_L(x_L) data curve -
-    the data-side counterpart of the summed-over-all-bins Pythia curves.
-    Returns (has_data[N_XL] bool, dsig_total[N_XL], dsig_err[N_XL]).
-    """
     dsig_sum = np.zeros(N_XL)
     err2_sum = np.zeros(N_XL)
     has_data = np.zeros(N_XL, dtype=bool)
@@ -849,7 +756,7 @@ def zeus_data_to_total_dsigma(zeus_data):
 
         y   = compute_y(q2_nom, x_nom)
         kin = 1.0 - y + 0.5 * y**2
-        conv = dis_prefactor(x_nom, q2_nom) * kin * dx * dQ2  # dsig = F2LN * conv
+        conv = dis_prefactor(x_nom, q2_nom) * kin * dx * dQ2
 
         for xl_v, f2_v, err_v in zip(xl_arr, f2_arr, err_arr):
             i = int(np.argmin(np.abs(XL_CTRS - xl_v)))
@@ -862,13 +769,6 @@ def zeus_data_to_total_dsigma(zeus_data):
 
 def make_zeus_total_plot(pythia_runs, zeus_data, out, legend_mode="full",
                          suffix="_dsigma_zeus_total"):
-    """One panel, dsigma/dx_L vs x_L, all PYTHIA_FILES curves overlaid
-    (as defined in the code - unchanged), summed over ONLY the ZEUS
-    (Q2,x_B) cells that carry a measurement, under the ZEUS cuts already
-    used elsewhere in this script (EePrime_MIN, THETA_N_MAX, PT_COEFF,
-    XL_EDGES), plus the ZEUS data points (summed the same way).
-    No pion-PDF (JAM21) curve is drawn, no kinematic-cut legend box.
-    """
     fig, ax = plt.subplots(figsize=(9, 7))
     fig.patch.set_facecolor("white")
     ax.set_facecolor("white")
@@ -888,8 +788,6 @@ def make_zeus_total_plot(pythia_runs, zeus_data, out, legend_mode="full",
                      fmt="o", color="black", ms=6, lw=1.3, capsize=3,
                      zorder=10, label="ZEUS")
 
-    # ---- headroom at the top, computed from the actual plotted values
-    #      (not hardcoded) so this still works if the inputs change ----
     y_candidates = [0.0]
     for run in pythia_runs:
         if run["have_pythia"]:
@@ -908,7 +806,7 @@ def make_zeus_total_plot(pythia_runs, zeus_data, out, legend_mode="full",
                    top=True, right=True, pad=6, labelsize=FS_TICK)
     ax.tick_params(which="minor", direction="in", length=3.5, width=1.0,
                    top=True, right=True)
-    bold_ticklabels(ax)          # bold + stroked x/y tick numbers
+    bold_ticklabels(ax)  # bold + stroked x/y tick numbers
 
     leg = ax.legend(loc="upper right", prop={"weight": "bold", "size": FS_LEGEND},
                      framealpha=0.92, edgecolor="0.45")
@@ -921,7 +819,6 @@ def make_zeus_total_plot(pythia_runs, zeus_data, out, legend_mode="full",
     plt.close(fig)
 
 
-# MAIN
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--zdat",     default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "zeus.dat"))
@@ -938,7 +835,7 @@ def main():
     print(f"  Loaded {len(zeus_data)} (Q2,x) cells "
           f"({sum(len(v[0]) for v in zeus_data.values())} data points)")
 
-    # ---- Load & process all 4 Pythia ROOT files, same recipe for each --
+    # load and process the Pythia ROOT files
     pythia_runs = []
     for spec in PYTHIA_FILES:
         path, label, color = spec["path"], spec["label"], spec["color"]
@@ -984,12 +881,6 @@ def main():
     make_grid(pythia_runs, zeus_data, f"{args.out}_root_plus_jam21",
               f2ln_jam=f2ln_jam, have_jam21=have_jam21, include_jam21=True)
 
-    # ZEUS-cuts total dsigma/dx_L plot: all ROOT files, summed
-    # ONLY over the (Q2,x_B) cells that actually carry a ZEUS data
-    # point (the diagonal band in the grid plot) - reuses the counts
-    # already computed above, so this is the literal sum of the same
-    # cells shown in the grid, directly comparable to the ZEUS data
-    # total below. No pion PDF.
     print(f"\nComputing ZEUS-cuts total dsigma/dx_L for all {n_sets} "
           f"ROOT files, restricted to the {len(zeus_data)} data-bearing "
           f"(Q2,x_B) cells (no pion PDF) ...")

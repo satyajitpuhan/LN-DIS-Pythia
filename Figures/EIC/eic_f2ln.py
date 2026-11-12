@@ -22,22 +22,16 @@ from scipy.integrate import quad
 
 warnings.filterwarnings("ignore")
 
-#  GLOBAL STYLE -- the same as for the H1/ZEUS grids, so the EIC grids
-#  come out visually identical to the ZEUS/H1 "staircase" figures: bold serif,
-#  heavy panel boxes, large tick/axis labels, thick curves, and NO whitespace
-#  between panels (wspace = hspace = 0).
-FS_AXLABEL = 42     # F_2^LN(...) and x_L universal axis labels
-FS_TITLE   = 28     # Q^2 column titles   (bin range only)
-FS_ROWLAB  = FS_TITLE   # x_B row labels -- SAME size as the Q^2 titles
-                        # (_fit_column_titles also applies one common shrink
-                        #  factor to both, so they stay equal on the page)
-FS_TICK    = 24     # x and y tick numbers
-FS_LEGEND  = 24     # the one shared corner legend
+FS_AXLABEL = 42
+FS_TITLE   = 28  # Q^2 column titles   (bin range only)
+FS_ROWLAB  = FS_TITLE  # x_B row labels
+FS_TICK    = 24  # x and y tick numbers
+FS_LEGEND  = 24  # the one shared corner legend
 
-SPINE_LW   = 3.2    # panel box -- deliberately heavy
-LW_BKG     = 2.6    # Pythia DIS-background histogram
-LW_SIG     = 3.2    # pion-PDF (JAM21) histogram
-LW_TOTAL   = 3.6    # Total = background + pion
+SPINE_LW   = 3.2  # panel box
+LW_BKG     = 2.6  # Pythia DIS-background histogram
+LW_SIG     = 3.2  # pion-PDF (JAM21) histogram
+LW_TOTAL   = 3.6
 
 AXIS_LABEL_STROKE = 1.1
 TICK_LABEL_STROKE = 0.6
@@ -47,7 +41,7 @@ matplotlib.rcParams.update({
     "font.serif"          : ["Times New Roman", "DejaVu Serif"],
     "font.weight"         : "bold",
     "mathtext.fontset"    : "dejavuserif",
-    "mathtext.default"    : "bfit",     # bold *italic* math (H1 style)
+    "mathtext.default"    : "bfit",  # bold *italic* math (H1 style)
     "axes.labelsize"      : FS_ROWLAB,
     "axes.labelweight"    : "bold",
     "axes.titlesize"      : FS_TITLE,
@@ -68,69 +62,40 @@ matplotlib.rcParams.update({
     "legend.edgecolor"    : "0.45",
     "legend.fontsize"     : FS_LEGEND,
     "figure.dpi"          : 150,
-    "axes.linewidth"      : SPINE_LW,   # bold panel boundaries
+    "axes.linewidth"      : SPINE_LW,  # bold panel boundaries
 })
 
-# Backwards-compatible aliases (older code in this file referenced these)
 FS_ROWLBL = FS_ROWLAB
 FS_AXIS   = FS_AXLABEL
 
-# Grid geometry: panels where no curve lands are HIDDEN, so the grid collapses
-# into the H1/ZEUS staircase shape and the freed corner hosts the one shared
-# legend. Pass --keep-empty to instead draw the full square 7x7 block.
 HIDE_EMPTY_PANELS = True
 
-# Optional horizontal reference lines drawn in every panel (empty = none,
-# which is the default -- pass e.g. --reflines 1,0.01 to switch them on).
-# When set, the common y-range is stretched so they stay inside the frame.
 REF_HLINES   = []
 REF_HL_COLOR = "0.35"
 REF_HL_LW    = 2.0
 REF_HL_LS    = (0, (7, 5))
 
-# filled in by _place_legend_in_empty_space(): the lowest point the
-# legend + F_2^LN pair reaches, so the universal x_L label can sit below it
 PAIR_BOTTOM = {}
 
-# The legend + F_2^LN pair is anchored to the TOP-RIGHT corner of the empty
-# staircase block -- that is where the free space is. These are the margins
-# kept from that corner, as a fraction of the figure. LEGEND_MARGIN_Y also has
-# to clear the x tick labels of the panel above, which hang down into the
-# block. Raise either to pull the pair back in from the corner.
 LEGEND_MARGIN_X = 0.010
 LEGEND_MARGIN_Y = 0.020
 
-PANEL_SIZE = 4.0     # inches per panel, square (7x7 -> 28 x 28 in figure)
+PANEL_SIZE = 4.0
 
-# One common y-range across all panels of a grid (see _apply_common_ylim).
-# LOG by default: the dynamic range over a full (Q2, x_B) grid is several
-# decades, so on a linear axis the low-rate panels are flat against the axis.
-# Pass --ylinear for a shared linear scale instead.
 YLOG = True
 
-# grid shape (same 6x6 layout for every config, different EDGES per config)
 NQ = 6
 NX = 6
 
-# x_L binning -- common to all configs.
-# Uniform width 0.10 over 0.30 <= x_L <= 1.00  ->  7 bins.
+# x_L binning
 XL_LO, XL_HI = 0.30, 1.00
 
-# Bin widths to produce figures for. The FIRST is the default: it is the one
-# the background-only and background+pion figures use. Every other width adds
-# one more totals figure, with the width in the filename.
-# Currently a single width, so EVERY figure -- background, background+pion and
-# totals -- is made with Delta x_L = 0.02 (35 bins over 0.30 <= x_L <= 1.00).
-# Add more widths back to the list to get the extra totals figures again.
 XL_WIDTHS = [0.02]
 
-# The ROOT files are streamed ONCE, into this fine base histogram; every width
-# above is an exact multiple of it, so the coarser binnings are obtained by
-# merging base bins rather than re-reading 200M+ entries per width.
 XL_DW_BASE    = 0.005
 XL_EDGES_BASE = np.round(np.arange(XL_LO, XL_HI + 0.5 * XL_DW_BASE,
                                    XL_DW_BASE), 6)
-N_XL_BASE     = len(XL_EDGES_BASE) - 1      # 140
+N_XL_BASE     = len(XL_EDGES_BASE) - 1
 
 
 def set_xl_binning(dw):
@@ -153,7 +118,6 @@ def set_xl_binning(dw):
 
 
 def merge_base_counts(counts_base):
-    """Sum the fine base-bin counts into the CURRENT x_L binning."""
     k = int(round(XL_DW / XL_DW_BASE))
     return np.asarray(counts_base, dtype=np.int64).reshape(-1, k).sum(axis=1)
 
@@ -171,41 +135,24 @@ set_xl_binning(XL_WIDTHS[0])
 ALPHA      = 1.0 / 137.036
 GEV2_TO_NB = 0.3893793656e6
 
-# CUTS
-THETA_E_MIN_DEG  = 135.0    # deg
-THETA_E_MAX_DEG  = 178.0    # deg
-EEPRIME_MIN      = 1.0      # GeV
-THETA_N_MAX_MRAD = 5.0      # mrad -- default / fallback
+THETA_E_MIN_DEG  = 135.0  # deg
+THETA_E_MAX_DEG  = 178.0  # deg
+EEPRIME_MIN      = 1.0  # GeV
+THETA_N_MAX_MRAD = 5.0  # mrad
 
-# The neutron angular acceptance is NOT the same for every beam energy: the
-# faster the proton beam, the smaller the angle a given p_T corresponds to.
-# _set_theta_n_max() is called with the value for each config before that
-# config is processed, so the cut, the implied p_T window and the pion-flux
-# k_perp^2 ceiling all follow from it consistently.
 CFG_THETA_N_MRAD = {
     "5x41":   5.0,
     "10x100": 2.5,
     "18x275": 1.0,
 }
 
-# p_T is NOT an independent cut. It is what the angular cut implies:
-#     p_T = p_z tan(theta_n),  p_z = x_L * E_p
-#  => p_T^max(x_L) = tan(theta_max) * x_L * E_p
 TAN_THETA_N_MAX = float(np.tan(THETA_N_MAX_MRAD * 1e-3))
 
-# Optional hard ceiling on the flux k_perp^2 integration.
-#   None -> no cap: integrate over the full accepted window (default)
-#   0.04 -> restore the flux model's original _K2_MAX truncation
+# Optional hard ceiling on the flux k_perp^2 integration
 K2_CAP = None
 
-# Plot ONLY cells that lie entirely inside the physical region y <= 1.
-#   * fully forbidden cells are empty anyway and were already hidden
-#   * cells the y = 1 line CUTS are dropped too: their quoted (x_B, Q^2)
-#     range overstates what the events cover, and the accessible-area
-#     correction they would need blows up as the accessible fraction -> 0
-# Set False (or pass --keep-partial) to keep them, area-corrected instead.
 DROP_PARTIAL_BINS = True
-PARTIAL_MIN_FRAC  = 0.999   # accessible fraction required to keep a cell
+PARTIAL_MIN_FRAC  = 0.999
 
 DROP_RADIATIVE = True
 Q2_GEN_MIN  = 1.0
@@ -214,7 +161,6 @@ XB_MAX_PHYS = 1.0
 N_GEN_FIXED = 5.0e8
 
 def cut_text():
-    """Cut list for annotations -- theta_n is per-config, so build it live."""
     return (r"$135^\circ<\theta_{e'}<178^\circ$, $E_{e'}>1$ GeV, "
             rf"$\theta_n<{THETA_N_MAX_MRAD:g}$ mrad")
 
@@ -231,19 +177,10 @@ NAME_TAG = "cfgbins"
 LBL_BKG   = "Pythia (CT18 NLO)"
 LBL_TOTAL = "Total"
 
-C_BKG   = "black"     # Pythia (CT18 NLO)
-C_JAM   = "navy"      # JAM21
-C_TOTAL = "#d62728"   # Total = Pythia + JAM21
+C_BKG   = "black"
+C_JAM   = "navy"  # JAM21
+C_TOTAL = "#d62728"
 
-# (key, LHAPDF set name, display label, colour). Member 0 -- "replica zero" --
-# is what load_pion_pdfs() asks for via lhapdf.mkPDF(setname, 0).
-# The background-only and background+pion figures use ONE set: MAIN_PION_KEY.
-# The three-set comparison lives in its own totals figure.
-# NOTE: JAM21 is the plain "JAM21PionPDFnlo" set, NOT "JAM21PionPDFnlo_pT".
-# MAIN_PION_KEY points here too, so the background+pion figure uses it as
-# well. To keep that figure on the _pT set, add a fourth entry
-#     ("jam21pt", "JAM21PionPDFnlo_pT", "JAM21", "navy"),
-# and set MAIN_PION_KEY = "jam21pt".
 PION_PDF_SETS = [
     ("jam21",   "JAM21PionPDFnlo",   "JAM21",   "#0a7cff"),  # bright blue
     ("xfitter", "xFitterPI_NLO_VAR", "xFitter", "#d62728"),  # red
@@ -259,33 +196,13 @@ CONFIGS = [
 ]
 CFG_COLORS = {"5x41": "#1f77b4", "10x100": "#2ca02c", "18x275": "#d62728"}
 
-# PER-CONFIG (Q2, x_B) RANGES
-# Taken from the accepted (cuts-applied) kinematic coverage of each beam
-# energy: (Q2_lo, Q2_hi, xB_lo, xB_hi). 7x7 log-spaced bins inside each.
-# These keep the full low-x_B reach, so the low-x / high-Q2 corner of each
-# grid is kinematically forbidden (y = Q2/(S x) > 1) and comes out empty --
-# that is physics, not a binning error. For 5x41, S = 820 GeV^2, so Q2 = 20
-# needs x > 0.024.
-# Cells the y = 1 line CUTS are handled by cell_phase_space_area(): the
-# counts are divided by the accessible area rather than the full rectangle,
-# which is what removes the artificial drop in the highest populated Q2 bin
-# of each row. main() reports the worst-corner y per config, and
-# process_root() lists every partially-accessible cell with its effective
-# Q2 upper edge.
 CFG_RANGES = {
-    #            Q2_lo  Q2_hi    xB_lo    xB_hi
+    # Q2_lo  Q2_hi    xB_lo    xB_hi
     "5x41":   (   1.0,   20.0,  1.0e-3,   0.5),
     "10x100": (   1.0,   80.0,  2.0e-4,   0.5),
     "18x275": (   1.0,  250.0,  5.0e-5,   0.5),
 }
 
-# Explicit Q^2 edges, rounded to readable values (1, 1.5, 2.4, ... rather than
-# the raw 1, 1.534, 2.354, ... that np.geomspace produces). They still span
-# the CFG_RANGES limits and stay close to log-spaced -- successive ratios are
-# within a few percent of each other -- so the columns remain evenly spaced on
-# a log axis. Set an entry to None to fall back to exact geomspace.
-# x_B edges are left as geomspace: they are printed in scientific notation
-# anyway, so rounding them buys no readability.
 CFG_Q2_EDGES = {
     "5x41":   [1, 1.5, 2.5, 4,  7,  12,  20],
     "10x100": [1, 2,   4,   9,  18, 40,  80],
@@ -302,10 +219,6 @@ def _round_sig(v, n=2):
 
 
 def _nice_x_edges(x_lo, x_hi, nx, n_sig=2):
-    """Log-spaced x_B edges rounded to n_sig significant figures, so the row
-    labels read 1.4 x 10^-2 rather than 1.42 x 10^-2. The endpoints are kept
-    exact and the sequence is forced strictly increasing.
-    """
     e = np.geomspace(x_lo, x_hi, nx + 1)
     r = [float(x_lo)] + [_round_sig(v, n_sig) for v in e[1:-1]] + [float(x_hi)]
     for i in range(1, len(r)):
@@ -314,29 +227,23 @@ def _nice_x_edges(x_lo, x_hi, nx, n_sig=2):
     return r
 
 
-# x_B edges: log-spaced then rounded to TWO significant figures, so the row
-# labels are short. Set an entry to None to fall back to exact geomspace.
 CFG_X_EDGES = {name: _nice_x_edges(CFG_RANGES[name][2],
                                    CFG_RANGES[name][3], NX)
                for name in CFG_RANGES}
 
 
 class Binning:
-    """A 7x7 log-spaced (Q2, x_B) grid plus the representative kinematics
-    used to evaluate both the DIS prefactor and JAM21.
-    """
 
     def __init__(self, name, q2_lo, q2_hi, x_lo, x_hi, nq=NQ, nx=NX,
                  q2_edges=None, x_edges=None):
         self.name = name
         if q2_edges is not None:
-            # explicit, human-rounded edges; nq follows from their count
+            # rounded bin edges
             self.q2_edges = np.asarray(q2_edges, dtype=float)
             nq = len(self.q2_edges) - 1
         else:
             self.q2_edges = np.geomspace(q2_lo, q2_hi, nq + 1)
         if x_edges is not None:
-            # explicit, 2-significant-figure edges; nx follows from their count
             self.x_edges = np.asarray(x_edges, dtype=float)
             nx = len(self.x_edges) - 1
         else:
@@ -350,12 +257,9 @@ class Binning:
         self.q2_rep = {(iq, ix): float(gq[iq]) for iq in range(nq) for ix in range(nx)}
         self.x_rep  = {(iq, ix): float(gx[ix]) for iq in range(nq) for ix in range(nx)}
         self.measured = {(iq, ix): False for iq in range(nq) for ix in range(nx)}
-        self.dropped  = set()   # cells removed for not being fully inside y<=1
+        self.dropped  = set()
 
     def set_measured_means(self, q2_sum, x_sum, n_cell):
-        """Replace the geometric-mean representative point of every cell that
-        actually has events with the event-weighted mean.
-        """
         n_meas = 0
         for cell, n in n_cell.items():
             if n > 0:
@@ -378,28 +282,18 @@ CFG_BINNING = {name: Binning(name, *CFG_RANGES[name],
                for name, _, _, _ in CONFIGS}
 
 
-# HELPERS (kinematics / labels)
 def sci(v):
     m, e = f"{v:.2e}".split("e")
     return rf"{float(m):.2f}\!\times\!10^{{{int(e)}}}"
 
 def q2_label(lo, hi):
-    """Column title: the BIN RANGE only. The variable is named once, by the
-    universal 'Q^2 [GeV^2] --->' arrow above the grid, so repeating it in all
-    seven headers would only eat panel width.
-    """
     return rf"$[{lo:g},\,{hi:g}]$"
 
 def _mant(v):
-    """Mantissa to TWO digits: 1.4, 5.0, 13, 36 -- never 1.42."""
     return f"{v:.1f}" if v < 10.0 else f"{v:.0f}"
 
 
 def xb_label(lo, hi):
-    """Row label: the BIN RANGE only, with ONE power of ten factored out of
-    the whole bin, split over two lines to stay compact in the staircase
-    margin.
-    """
     e = int(np.floor(np.log10(lo)))
     return (rf"$[{_mant(lo / 10.0**e)},\,{_mant(hi / 10.0**e)}]$" + "\n"
             + rf"$\times 10^{{{e}}}$")
@@ -418,14 +312,12 @@ def dis_prefactor(x, Q2):
 
 def cell_phase_space_area(x_lo, x_hi, q_lo, q_hi, S):
     """Area of the part of the (x_B, Q^2) cell that satisfies y <= 1."""
-    xa = q_lo / S          # S x = q_lo
-    xb = q_hi / S          # S x = q_hi
+    xa = q_lo / S  # S x = q_lo
+    xb = q_hi / S  # S x = q_hi
     area = 0.0
-    # sloped part: q_lo < S x < q_hi   ->  integrand (S x - q_lo)
     lo = max(x_lo, xa); hi = min(x_hi, xb)
     if hi > lo:
         area += 0.5 * S * (hi * hi - lo * lo) - q_lo * (hi - lo)
-    # fully open part: S x >= q_hi     ->  integrand (q_hi - q_lo)
     lo = max(x_lo, xb); hi = x_hi
     if hi > lo:
         area += (q_hi - q_lo) * (hi - lo)
@@ -433,17 +325,11 @@ def cell_phase_space_area(x_lo, x_hi, q_lo, q_hi, S):
 
 
 def effective_q2_hi(x_hi, q_lo, q_hi, S):
-    """Largest Q^2 actually reachable in this cell: min(q_hi, S x_hi).
-    When this is below q_hi the printed bin range overstates the Q^2 range
-    the events really cover.
-    """
+    """Largest Q^2 actually reachable in this cell: min(q_hi, S x_hi)."""
     return min(q_hi, S * x_hi)
 
 
 def dsig_to_f2ln(dsig_per_xl, x, Q2, dx, dQ2, S, area=None):
-    """`area` is the ACCESSIBLE (y <= 1) area of the cell; it defaults to the
-    full rectangle dx*dQ2 for cells that are entirely inside y < 1.
-    """
     y   = compute_y(Q2, x, S)
     kin = 1.0 - y + 0.5 * y**2
     P   = dis_prefactor(x, Q2)
@@ -451,11 +337,7 @@ def dsig_to_f2ln(dsig_per_xl, x, Q2, dx, dQ2, S, area=None):
     return np.asarray(dsig_per_xl, dtype=float) / (P * kin * A)
 
 
-# BOLD-TEXT HELPERS
 def _stroke(*artists, width=TICK_LABEL_STROKE):
-    """Make text noticeably heavier at the SAME font size by stroking the
-    glyph outlines (mathtext has no weight above bold).
-    """
     if width <= 0:
         return
     fx = [patheffects.withStroke(linewidth=width, foreground="black")]
@@ -488,7 +370,6 @@ def _legend(ax, ncol=1, fontsize=FS_LEGEND):
     return _bold_legend(leg)
 
 
-# PION-PDF PHYSICS
 class PionPDF:
     __slots__ = ("key", "setname", "label", "color", "pdf", "_memo")
 
@@ -600,13 +481,10 @@ def _f2pi_cached(ppdf, x, Q2):
         ppdf._memo[key] = val
     return val
 
-# -- pion flux (Model I) ----------------------------------------------------
+# pion flux (Model I)
 _M_N=0.9382720813; _M_PI=0.13957039; _G_A=1.267; _F_PI=0.093
 _LAMBDA_CUT=1.31
-_K2_MAX=0.04    # GeV^2 -- the flux model's ORIGINAL truncation. Not used as
-                # the integration ceiling any more (k2max_for_config derives
-                # that from tan(theta_max)*x_L*E_p); pass it to --k2-cap to
-                # restore the original behaviour.
+_K2_MAX=0.04  # GeV^2
 
 def _d_piN(k2, xL):
     xbar = 1.0 - xL
@@ -638,10 +516,6 @@ def _set_theta_n_max(mrad):
 
 
 def k2max_for_config(E_p):
-    """k_perp^2 ceiling matching the neutron acceptance of this beam:
-    p_T^max(x_L) = tan(theta_max) * x_L * E_p
-    k2max(x_L)   = p_T^max^2      (optionally capped by K2_CAP)
-    """
     def f(xL):
         pt = TAN_THETA_N_MAX * float(xL) * E_p
         k2 = pt * pt
@@ -660,9 +534,6 @@ def _f2ln_pointwise(ppdf, xL, xbj, q2, k2max):
 
 def rebin_pdf_to_xl_edges(ppdf, k2max_fn, binning, n_sub=12, verbose=True,
                           tag=""):
-    """Average F_2^{LN} over each x_L bin, for every (Q2, x_B) cell of THIS
-    config's grid, evaluated at that cell's representative (mean) kinematics.
-    """
     hist = {}
     n_cells = binning.nq * binning.nx
     done = 0
@@ -690,7 +561,6 @@ def rebin_pdf_to_xl_edges(ppdf, k2max_fn, binning, n_sub=12, verbose=True,
     return hist
 
 
-# ROOT LOADER
 def _resolve_paths(path):
     import glob as _glob
     if os.path.isdir(path):
@@ -738,7 +608,7 @@ def process_root(path, E_e, E_p, label, binning, treename="tree",
         s = meta(f, "sigmaGen_nb")
         if s is not None:
             sigma_all.append((os.path.basename(p), float(s)))
-            sigma_dis = float(s)          # final file wins
+            sigma_dis = float(s)  # final file wins
         if treename not in f:
             available = [k.split(";")[0] for k in f.keys()]
             raise RuntimeError(
@@ -766,7 +636,6 @@ def process_root(path, E_e, E_p, label, binning, treename="tree",
         want = ["Q2", "xB", "xL", "EePrime", "theta_e", "theta_n"]
 
         cells  = [(iq, ix) for iq in range(NQc) for ix in range(NXc)]
-        # fine base histogram: merged down to each requested width later
         counts = {c: np.zeros(N_XL_BASE, dtype=np.int64) for c in cells}
         # accumulators for the event-weighted mean kinematics per cell
         q2_sum = {c: 0.0 for c in cells}
@@ -897,10 +766,6 @@ def process_root(path, E_e, E_p, label, binning, treename="tree",
           f"k_perp^2 max = {pt_lo**2:.4f} -> {pt_hi**2:.4f} GeV^2"
           + (f", capped at {K2_CAP:g}" if K2_CAP is not None else " (uncapped)"))
 
-    # which cells survive the y <= 1 requirement
-    # (this depends only on the (x_B, Q^2) grid, never on the x_L binning, so
-    #  it is decided once here; F_2^LN itself is built per x_L width by
-    #  f2ln_bkg_for_binning() below)
     partial = []
     for iq in range(NQc):
         q2lo, q2hi = binning.q2_bins[iq]
@@ -915,12 +780,6 @@ def process_root(path, E_e, E_p, label, binning, treename="tree",
             afull = dx * dQ2
             frac  = area / afull if afull > 0 else 0.0
 
-            # A cell the y = 1 line CUTS is only partly measurable: the quoted
-            # Q^2 and x_B ranges overstate what the events actually cover, and
-            # the correction needed grows without bound as frac -> 0. With
-            # DROP_PARTIAL_BINS these are removed outright, alongside the
-            # fully forbidden ones, so every panel that survives spans its
-            # full quoted range.
             if DROP_PARTIAL_BINS and frac < PARTIAL_MIN_FRAC:
                 if c.sum() > 0:
                     partial.append((iq, ix, frac,
@@ -952,7 +811,6 @@ def process_root(path, E_e, E_p, label, binning, treename="tree",
 
 
 def f2ln_bkg_for_binning(counts_base, binning, S, sigma_dis, N_gen):
-    """F_2^LN of the Pythia background for the CURRENT x_L binning."""
     f2ln_bkg = {}
     for iq in range(binning.nq):
         q2lo, q2hi = binning.q2_bins[iq]
@@ -967,7 +825,7 @@ def f2ln_bkg_for_binning(counts_base, binning, S, sigma_dis, N_gen):
             c = merge_base_counts(counts_base[cell])
             area = cell_phase_space_area(xlo, xhi, q2lo, q2hi, S)
             if area <= 0.0:
-                area = dx * dQ2         # forbidden -> empty anyway
+                area = dx * dQ2  # forbidden -> empty anyway
             dsig = sigma_dis * c.astype(float) / N_gen / XL_BWS
             f2ln_bkg[cell] = dsig_to_f2ln(dsig, binning.x_rep[cell],
                                           binning.q2_rep[cell], dx, dQ2, S,
@@ -975,22 +833,11 @@ def f2ln_bkg_for_binning(counts_base, binning, S, sigma_dis, N_gen):
     return f2ln_bkg
 
 
-# PLOTTING  --  H1/ZEUS "staircase" style:
-#   * panels touch edge to edge (wspace = hspace = 0, no tight_layout)
-#   * UNIVERSAL labelling: one x_L label under the whole grid, one
-#     F_2^LN(...) label in the empty corner, and per-panel text reduced
-#     to the BIN RANGE only (Q^2 range on top of each column, x_B range
-#     to the left of each row), all at the large font sizes of the H1/ZEUS grids
-#   * ONE shared bold legend in the largest empty corner block
-# only two x_L ticks per panel: with zero spacing between panels a denser set
-# runs into the neighbouring panel's labels
 XL_TICKS = [0.50, 0.75, 1.00]
 
 
 def _xl_tick_fmt(v, pos):
-    """Bold x_L tick labels: 0.40, 0.60, ... 1 -- whole numbers lose the
-    trailing '.00' (H1/ZEUS style).
-    """
+    """Bold x_L tick labels: 0.40, 0.60, ..."""
     if abs(v - round(v)) < 1e-9:
         return rf"$\mathbf{{{int(round(v))}}}$"
     return rf"$\mathbf{{{v:.2f}}}$"
@@ -1030,9 +877,6 @@ def _curves_combo(f2ln_bkg, sig_hist, ppdf, cell):
     sig = sig_hist.get(cell, np.zeros(N_XL))
     if not np.any(bkg != 0):
         return []
-    # Total FIRST (thick, lowest zorder) then the two components on top of it:
-    # where the background is negligible Total and JAM21 coincide, and whatever
-    # is drawn last wins -- previously that was Total, which erased JAM21.
     return [(bkg + sig, C_TOTAL,     LW_TOTAL, '-',  LBL_TOTAL),
             (bkg,       C_BKG,       LW_BKG,   ':',  LBL_BKG),
             (sig,       ppdf.color,  LW_SIG,   '--', ppdf.label)]
@@ -1050,18 +894,14 @@ def _curves_totals(f2ln_bkg, sig_hists, ppdfs, cell):
             continue
         out.append((bkg + sig, pp.color, LW_TOTAL, '-',
                     f"{pp.label} + {LBL_BKG}"))
-    # the DIS-fragmentation background on its own, dotted, drawn LAST so it
-    # stays visible where a total sits on top of it
     out.append((bkg, C_BKG, LW_BKG, ':', LBL_BKG))
     return out
 
 
 def _apply_common_ylim(axes, arrays, log=None):
-    """Force ONE y-range across every panel of the grid."""
     log = YLOG if log is None else log
     vals = np.concatenate([np.asarray(a, float).ravel() for a in arrays]) \
            if arrays else np.array([0.0])
-    # the reference lines must be inside the frame, or they are pointless
     if REF_HLINES:
         vals = np.concatenate([vals, np.asarray(REF_HLINES, float)])
     vals = vals[np.isfinite(vals)]
@@ -1073,7 +913,6 @@ def _apply_common_ylim(axes, arrays, log=None):
     if log:
         pos = vals[vals > 0.0]
         vmin = float(pos.min()) if pos.size else vmax * 1e-6
-        # never span more than ~6 decades, or the interesting panels vanish
         vmin = max(vmin, vmax * 1e-6)
         lim = (vmin / 1.5, vmax * 1.5)
     else:
@@ -1084,8 +923,6 @@ def _apply_common_ylim(axes, arrays, log=None):
             ax.yaxis.set_major_locator(LogLocator(base=10.0, numticks=5))
             ax.yaxis.set_major_formatter(LogFormatterMathtext(base=10.0))
         else:
-            # prune the end ticks: with zero vertical spacing the top/bottom
-            # labels of neighbouring panels would otherwise collide
             ax.yaxis.set_major_locator(MaxNLocator(nbins=4, prune="both"))
             ax.yaxis.set_minor_locator(AutoMinorLocator())
         ax.set_ylim(*lim)
@@ -1115,9 +952,6 @@ def _largest_empty_block_at(cell_has_data, nrow, ncol, corner="top-left"):
 
 
 def _largest_corner_empty_block(cell_has_data, nrow, ncol):
-    """Largest fully-empty rectangle anchored at the bottom-right or the
-    top-left corner (whichever is bigger).
-    """
     a = _largest_empty_block_at(cell_has_data, nrow, ncol, "bottom-right")
     b = _largest_empty_block_at(cell_has_data, nrow, ncol, "top-left")
     cands = [c for c in (a, b) if c]
@@ -1135,10 +969,6 @@ def _block_centre(axes, block):
 
 def _place_legend_in_empty_space(fig, axes, cell_has_data, source_ax, nrow, ncol,
                                  extra_label=None, fontsize=None, title=None):
-    """Grab the curve handles from a populated panel and draw ONE big bold
-    legend centred in the largest empty corner block, shrinking the font
-    until it fits inside that block.
-    """
     handles, labels = source_ax.get_legend_handles_labels()
     if not handles:
         return False
@@ -1158,9 +988,6 @@ def _place_legend_in_empty_space(fig, axes, cell_has_data, source_ax, nrow, ncol
 
     block = _largest_corner_empty_block(cell_has_data, nrow, ncol)
     if not block:
-        # Every panel is occupied. Put the legend OUTSIDE the grid, clear above
-        # the column titles -- the old "upper right" fallback sat on top of the
-        # last title and the Q^2 arrowhead.
         vis = [a for a in np.ravel(axes) if a.get_visible()]
         pos = [a.get_position() for a in vis]
         gx1 = max(p.x1 for p in pos)
@@ -1183,18 +1010,12 @@ def _place_legend_in_empty_space(fig, axes, cell_has_data, source_ax, nrow, ncol
         leg.get_frame().set_linewidth(1.6)
         leg.set_zorder(1000)
         _bold_legend(leg)
-        # no empty block -> extra_label was NOT added; caller draws it itself
         return False
 
     positions = [axes[r][q].get_position() for r, q in block]
     bx0 = min(p.x0 for p in positions); bx1 = max(p.x1 for p in positions)
     by0 = min(p.y0 for p in positions); by1 = max(p.y1 for p in positions)
     cx, cy = 0.5 * (bx0 + bx1), 0.5 * (by0 + by1)
-    # Space available inside the empty block, inset so the frames never touch
-    # the neighbouring panel spines. The legend and the F_2^LN box are sized
-    # and positioned as ONE stacked pair that must fit in here -- earlier
-    # versions sized them independently, so the pair could overflow the block
-    # and hang off the edge of the figure.
     avail_w = 0.92 * (bx1 - bx0)
     avail_h = 0.92 * (by1 - by0)
     max_w = avail_w
@@ -1211,8 +1032,6 @@ def _place_legend_in_empty_space(fig, axes, cell_has_data, source_ax, nrow, ncol
                             dict(title=title,
                                  title_fontproperties={"weight": "bold",
                                                        "size": fs})))
-        # fully opaque and above the panel spines: the legend straddles panel
-        # borders, and a translucent frame let the boxes ghost through
         leg.get_frame().set_facecolor("white")
         leg.get_frame().set_alpha(1.0)
         leg.get_frame().set_linewidth(1.6)
@@ -1225,19 +1044,14 @@ def _place_legend_in_empty_space(fig, axes, cell_has_data, source_ax, nrow, ncol
             bb = None
         return leg, bb
 
-    # Draw at the SAME size as the Q^2 / x_B panel labels. There is no
-    # grow-to-fill step any more: it used to inflate the legend up to
-    # FS_AXLABEL and made it visibly larger than every other label.
     fs = float(fontsize if fontsize else FS_LEGEND)
     leg, bb = _draw(fs)
-    # Safety only: shrink if the block genuinely cannot hold it at that size.
     for _ in range(12):
         if bb is None or (bb.width <= max_w and bb.height <= max_h) or fs <= 8.0:
             break
         fs *= max(0.55, min(0.92, min(max_w / bb.width, max_h / bb.height)))
         leg.remove(); leg, bb = _draw(fs)
 
-    # SECOND, separate box: the F_2^LN axis label, directly below
     if not extra_label:
         return False
     if bb is None:
@@ -1247,14 +1061,6 @@ def _place_legend_in_empty_space(fig, axes, cell_has_data, source_ax, nrow, ncol
         except Exception:
             return False
 
-    # MEASURE the F_2 box, then place BOTH once, centred as a pair
-    # Everything is measured first and drawn at its final coordinates. An
-    # earlier version moved the legend afterwards with set_bbox_to_anchor(),
-    # which silently re-centred it horizontally and left it out of line with
-    # the F_2 box below (and overlapping the panel to its left).
-    # The F_2^LN box is an AXIS LABEL, so it starts at FS_AXLABEL and is only
-    # shrunk as far as it must to fit the block -- never below the curve
-    # legend's size. The curve legend itself stays at the panel-label size.
     gap   = 0.010
     box_w = 0.98 * (bx1 - bx0)
     fs2   = float(FS_AXLABEL)
@@ -1279,7 +1085,6 @@ def _place_legend_in_empty_space(fig, axes, cell_has_data, source_ax, nrow, ncol
     if bb2 is None:
         return True
 
-    # shrink the PAIR until it fits the block in BOTH directions
     def _redraw_pair(f1, f2):
         nonlocal leg, bb, t2, bb2
         leg.remove(); leg, bb = _draw(f1)
@@ -1310,17 +1115,15 @@ def _place_legend_in_empty_space(fig, axes, cell_has_data, source_ax, nrow, ncol
     if bb is None or bb2 is None:
         return True
 
-    # centre the pair in the block, clamped to stay inside it
     h_pair = bb.height + gap + bb2.height
     w_pair = max(bb.width, bb2.width)
-    # top-RIGHT of the block, not its centre: that is where the empty space is
     cx_p = bx1 - 0.5 * w_pair - LEGEND_MARGIN_X
     cy_p = by1 - 0.5 * h_pair - LEGEND_MARGIN_Y
     # never push it out of the block on the other side
     if bx1 - bx0 >= w_pair:
         cx_p = max(cx_p, bx0 + 0.5 * w_pair)
     else:
-        cx_p = cx                       # block narrower than the pair
+        cx_p = cx  # block narrower than the pair
     if by1 - by0 >= h_pair:
         cy_p = max(cy_p, by0 + 0.5 * h_pair)
     else:
@@ -1354,9 +1157,6 @@ def _place_legend_in_empty_space(fig, axes, cell_has_data, source_ax, nrow, ncol
 def _place_f2_label_top_left(fig, axes, cell_has_data, nrow, ncol, text,
                              fontsize, stroke=None, dx=0.0,
                              row_label_texts=None):
-    """Put the F_2^LN axis label INSIDE the empty top-left staircase corner,
-    horizontal -- the way the published H1/ZEUS figures do it.
-    """
     block = _largest_empty_block_at(cell_has_data, nrow, ncol, "top-left")
     if not block:
         return False
@@ -1366,8 +1166,6 @@ def _place_f2_label_top_left(fig, axes, cell_has_data, nrow, ncol, text,
     positions = [axes[r][q].get_position() for r, q in block]
     x0 = min(p.x0 for p in positions); x1 = max(p.x1 for p in positions)
     y0 = min(p.y0 for p in positions); y1 = max(p.y1 for p in positions)
-    # the x_B row label of any row crossing this block hangs into it from the
-    # right; clip the available width at the leftmost such label
     try:
         fig.canvas.draw()
         rend = fig.canvas.get_renderer()
@@ -1412,11 +1210,7 @@ def _place_f2_label_top_left(fig, axes, cell_has_data, nrow, ncol, text,
 
 
 def _clear_row_labels(fig, axes, row_label_texts, pad=0.06):
-    """Push each x_B row label left until it clears that panel's y tick
-    numbers. A fixed axes-fraction offset cannot work: the tick text width
-    depends on the y range (0.03 vs 0.0075 are very different widths), so the
-    labels were landing on top of the numbers.
-    """
+    """Push each x_B row label left until it clears that panel's y tick numbers."""
     try:
         fig.canvas.draw()
         rend = fig.canvas.get_renderer()
@@ -1429,16 +1223,12 @@ def _clear_row_labels(fig, axes, row_label_texts, pad=0.06):
             if not tl.get_visible() or not tl.get_text():
                 continue
             bb = tl.get_window_extent(rend).transformed(ax.transAxes.inverted())
-            x_left = min(x_left, bb.x0)     # leftmost edge of the tick numbers
+            x_left = min(x_left, bb.x0)  # leftmost edge of the tick numbers
         txt.set_position((x_left - pad, 0.5))
 
 
 def _fit_column_titles(fig, axes, row_label_texts=None,
                        fontsize=FS_TITLE, frac=0.86):
-    """Shrink ALL Q^2 column titles by one common factor until the widest one
-    fits inside a panel -- with zero horizontal spacing, neighbouring titles
-    would otherwise run into each other.
-    """
     titled = [ax for ax in np.ravel(axes)
               if ax.get_visible() and ax.get_title()]
     if not titled:
@@ -1463,7 +1253,7 @@ def _fit_column_titles(fig, axes, row_label_texts=None,
 
 
 def _place_direction_arrows(fig, axes, vis, fontsize=FS_AXLABEL):
-    """The two universal variable labels of the H1/ZEUS grid style:"""
+    """The two axis labels of the grid."""
     pos = [ax.get_position() for ax in vis]
     gx0 = min(p.x0 for p in pos); gx1 = max(p.x1 for p in pos)
     gy0 = min(p.y0 for p in pos); gy1 = max(p.y1 for p in pos)
@@ -1478,12 +1268,10 @@ def _place_direction_arrows(fig, axes, vis, fontsize=FS_AXLABEL):
     except Exception:
         ux0, uy0, uy1 = gx0 - 0.05, gy0 - 0.03, gy1 + 0.03
 
-    # mutation_scale is what actually sizes the head on a FancyArrowPatch
     arrow = dict(arrowstyle="-|>", mutation_scale=75,
                  color="black", lw=6.0, joinstyle="miter",
                  shrinkA=0.0, shrinkB=0.0)
 
-    # Q^2 ---> , above the column titles
     ay = uy1 + 0.012
     ax0 = gx0 + 0.30 * (gx1 - gx0)
     ax1 = gx0 + 0.85 * (gx1 - gx0)
@@ -1493,8 +1281,6 @@ def _place_direction_arrows(fig, axes, vis, fontsize=FS_AXLABEL):
     fig.add_artist(plt.matplotlib.patches.FancyArrowPatch(
         (ax0, ay), (ax1, ay), transform=fig.transFigure, **arrow))
 
-    # x_B  |  , left of the row labels, pointing down
-    #           v
     axp = ux0 - 0.018
     ay1 = gy0 + 0.78 * (gy1 - gy0)
     ay0 = gy0 + 0.22 * (gy1 - gy0)
@@ -1515,20 +1301,14 @@ def _make_grid(binning, out, suffix, curves_fn, config_label=None,
                              sharex=False, sharey=True)
     fig.patch.set_facecolor("white")
 
-    # Make every panel box exactly square: pick the subplot margins so the
-    # whole grid area is (nq x nx) panels of identical width and height in
-    # INCHES. Default margins are ~0.6 % off, which is enough to read as
-    # slightly rectangular on a 28-inch figure.
     left, bottom = 0.10, 0.06
-    span_w = 0.98 - left                       # fraction of the figure width
-    panel_in = span_w * fig_w / nq             # panel side, inches
+    span_w = 0.98 - left  # fraction of the figure width
+    panel_in = span_w * fig_w / nq  # panel side, inches
     span_h = panel_in * nx / fig_h
     fig.subplots_adjust(left=left, right=left + span_w,
                         bottom=bottom, top=bottom + span_h,
                         wspace=0.0, hspace=0.0)
 
-    # has_curve : where a curve actually lands (drives legend / label placement)
-    # visible   : which panels are drawn (everything, unless HIDE_EMPTY_PANELS)
     curves, has_curve = {}, {}
     for ix in range(nx):
         row = nx - 1 - ix
@@ -1573,15 +1353,12 @@ def _make_grid(binning, out, suffix, curves_fn, config_label=None,
             if legend_source_ax is None and curves[(row, iq)]:
                 legend_source_ax = ax
 
-            # UNIVERSAL panel labelling: bin ranges only
             if row == first_visible_row.get(iq):
                 q2lo, q2hi = binning.q2_bins[iq]
                 ax.set_title(q2_label(q2lo, q2hi), fontsize=FS_TITLE, pad=9,
                              fontweight="bold")
 
             if iq == first_visible_col.get(row):
-                # free-standing text just outside the panel's left edge
-                # (not a ylabel) so the two-line range never gets clipped
                 row_label_texts[row] = ax.text(
                     -0.06, 0.5, xb_label(xlo, xhi),
                     transform=ax.transAxes, ha="right", va="center",
@@ -1600,17 +1377,12 @@ def _make_grid(binning, out, suffix, curves_fn, config_label=None,
     label_size = _fit_column_titles(fig, axes, row_label_texts)
     _clear_row_labels(fig, axes, row_label_texts)
 
-    # ---- the F_2^LN label text (built here: it now goes INSIDE the legend) --
-    # corner version is stacked (narrow block); the one that rides in the
-    # legend, or the rotated left-margin fallback, stays on one line
     _f2_corner = r"$F_{2}^{LN}(x_B,\,Q^{2},\,x_L)$"
     _f2_flat   = r"$F_{2}^{LN}(x_B,\,Q^{2},\,x_L)$"
     if config_label is not None:
         _f2_corner += "\n" + rf"$[{config_label}]$"
         _f2_flat   += rf"$\ [{config_label}]$"
 
-    # one big, bold legend in the largest curve-free corner block, with the
-    # F_2^LN label as its last entry -- i.e. directly under 'Total'
     PAIR_BOTTOM.clear()
     f2_in_legend = False
     if legend_source_ax is not None:
@@ -1644,14 +1416,11 @@ def _make_grid(binning, out, suffix, curves_fn, config_label=None,
     pb = PAIR_BOTTOM.get("y")
     if (pb is not None and pb < uy0
             and PAIR_BOTTOM.get("x0", 1) <= cx <= PAIR_BOTTOM.get("x1", -1)):
-        y_xl = pb - pad          # the F_2^LN box hangs below the panels here
+        y_xl = pb - pad
     t_x = fig.text(cx, y_xl, r"$x_L$", ha="center", va="top",
                    fontsize=FS_AXLABEL, fontweight="bold")
     t_x.set_path_effects(_lbl_stroke)
 
-    # Already shown as the last legend entry? Then nothing more to draw.
-    # Otherwise: empty top-left corner if there is one, else rotated in the
-    # left margin.
     placed = f2_in_legend
     if not placed and HIDE_EMPTY_PANELS:
         placed = _place_f2_label_top_left(fig, axes, has_curve, nx, nq,
@@ -1688,9 +1457,6 @@ def make_grid_combo(f2ln_bkg, sig_hist, ppdf, binning, out):
 
 
 def make_grid_totals(f2ln_bkg, sig_hists, ppdfs, binning, out, dw=None):
-    """One Total curve per pion PDF set plus the dotted Pythia background, on
-    LINEAR x and y axes (ylog=False regardless of --ylinear/--ylog).
-    """
     suffix = f"totals_grid{binning.nq}x{binning.nx}"
     if dw is not None:
         suffix += "_" + xl_tag(dw)
@@ -1700,9 +1466,6 @@ def make_grid_totals(f2ln_bkg, sig_hists, ppdfs, binning, out, dw=None):
 
 
 def dump_binning_table(name, binning, E_e, E_p):
-    """Print the grid and its representative kinematics -- this is the
-    'mean values' actually fed to both the prefactor and JAM21.
-    """
     S = 4.0 * E_e * E_p
     print(f"\n[{name}] (Q2, x_B) grid and representative kinematics "
           f"(sqrt(s) = {np.sqrt(S):.1f} GeV):")
@@ -1734,7 +1497,6 @@ def dump_binning_table(name, binning, E_e, E_p):
                   f"{q_eff:10.3g}  {100*frac:5.1f}%  {src}{flag}")
 
 
-# MAIN
 def main():
     global K2_CAP, OUT_DIR, NAME_TAG, YLOG, HIDE_EMPTY_PANELS, REF_HLINES
     global DROP_PARTIAL_BINS
@@ -1790,7 +1552,6 @@ def main():
     OUT_DIR  = args.outdir
     NAME_TAG = args.tag
     os.makedirs(OUT_DIR, exist_ok=True)
-    # An explicit --theta-n-max overrides the per-config table for every config
     theta_override = (args.theta_n_max
                       if args.theta_n_max != THETA_N_MAX_MRAD else None)
 
@@ -1827,7 +1588,7 @@ def main():
     for name, _, E_e, E_p in CONFIGS:
         q2lo, q2hi, xlo, xhi = CFG_RANGES[name]
         S_cfg   = 4.0 * E_e * E_p
-        y_worst = q2hi / (S_cfg * xlo)          # corner (x_lo, Q2_hi)
+        y_worst = q2hi / (S_cfg * xlo)
         print(f"    {name:>7} : Q2 [{q2lo:g}, {q2hi:g}] GeV^2, "
               f"x_B [{xlo:g}, {xhi:g}],  S = {S_cfg:g},  "
               f"worst-corner y = {y_worst:.3g}")
@@ -1845,9 +1606,6 @@ def main():
     for name, _, E_e, E_p in CONFIGS:
         root_path = paths[name]
         binning   = CFG_BINNING[name]
-        # THIS config's neutron acceptance, before anything is read or
-        # computed: the cut, the p_T window and the flux k_perp^2 ceiling all
-        # come from it (and it clears the flux cache)
         theta_n = (theta_override if theta_override is not None
                    else CFG_THETA_N_MRAD.get(name, THETA_N_MAX_MRAD))
         _set_theta_n_max(theta_n)
@@ -1866,22 +1624,16 @@ def main():
         S_cfg = 4.0 * E_e * E_p
         dump_binning_table(name, binning, E_e, E_p)
 
-        # every pion set at THIS config's cell means, over THIS config's
-        # k_perp window
         k2fn = k2max_for_config(E_p)
         print(f"\n[{name}] pion PDFs: k_perp^2 max "
               f"{k2fn(XL_EDGES[0]):.4f} -> {k2fn(XL_EDGES[-1]):.4f} GeV^2, "
               f"evaluated at the measured <Q2>,<x_B> of each cell")
         wanted = pion_pdfs if not args.no_totals else [ppdf]
 
-        # ONE pass over the ROOT file, several x_L binnings: the fine base
-        # histogram is merged down to each requested width in turn.
         for iw, dw in enumerate(XL_WIDTHS):
             set_xl_binning(dw)
             f2ln_bkg = f2ln_bkg_for_binning(counts_base, binning, S_cfg,
                                             sigma_dis, N_gen)
-            # finer bins need fewer sub-samples each: this keeps the number of
-            # pion-PDF evaluations per cell roughly constant across widths
             n_sub = max(3, int(round(args.n_sub * dw / XL_WIDTHS[0])))
             print(f"\n[{name}] x_L binning: {N_XL} bins of "
                   f"Delta x_L = {dw:g}   (pion n_sub = {n_sub})")
@@ -1893,8 +1645,6 @@ def main():
 
             print(f"Saving grids for {name}, Delta x_L = {dw:g} ...")
             if iw == 0:
-                # the background-only and background+pion figures use the
-                # default (first) width only
                 make_grid_background(f2ln_bkg, binning, out=name)
                 make_grid_combo(f2ln_bkg, sig_hists[ppdf.key], ppdf,
                                 binning, out=name)
@@ -1903,8 +1653,6 @@ def main():
                                  out=name, dw=dw)
         set_xl_binning(XL_WIDTHS[0])
 
-    # No combined grid: the three configs no longer share a (Q2, x_B) grid,
-    # so overlaying them panel-by-panel would compare different bins.
     print("\nNote: no combined overlay grid -- each config now has its own "
           "(Q2, x_B) binning, so the panels are not comparable cell by cell.")
 

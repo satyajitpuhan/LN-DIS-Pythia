@@ -1,8 +1,5 @@
 """H1: the five Pythia settings with the JAM21 Sullivan term (F2^LN grids, chi^2) and the
 overview of three pion PDFs times five Pythia settings.
-
-The Sullivan term is evaluated at the nominal (x_B, Q^2) of each bin, with member 0 of
-each pion PDF set and Lambda = 1.31 GeV.
 """
 
 import argparse, os, warnings, gc
@@ -20,21 +17,20 @@ from scipy.integrate import quad
 
 warnings.filterwarnings('ignore')
 
-# FONT SIZES / WEIGHTS -- house style.
-# Scaled up for the large 4.8 x 4.0 inch staircase panels.
-FS_AXLABEL = 42     # F_2^LN(...) and x_L axis labels
-FS_TITLE   = 28     # Q^2 column titles
-FS_ROWLAB  = 26     # x_B row labels
-FS_TICK    = 24     # x and y tick numbers
-FS_LEGEND  = 24     # the one shared corner legend
+# FONT SIZES / WEIGHTS
+FS_AXLABEL = 42  # F_2^LN(...) and x_L axis labels
+FS_TITLE   = 28  # Q^2 column titles
+FS_ROWLAB  = 26  # x_B row labels
+FS_TICK    = 24  # x and y tick numbers
+FS_LEGEND  = 24  # the one shared corner legend
 
-SPINE_LW   = 3.2    # panel box -- deliberately heavy
-LW_PYTHIA  = 2.6    # raw Pythia (DIS background) histograms
-LW_JAM     = 3.2    # raw JAM21 pion histogram
-LW_SUM     = 3.2    # Pythia + JAM21 sums
-DATA_MS    = 7.0    # H1 marker size
+SPINE_LW   = 3.2  # panel box
+LW_PYTHIA  = 2.6  # raw Pythia (DIS background) histograms
+LW_JAM     = 3.2  # raw JAM21 pion histogram
+LW_SUM     = 3.2  # Pythia + JAM21 sums
+DATA_MS    = 7.0  # H1 marker size
 DATA_MEW   = 1.5
-DATA_ELW   = 2.0    # error-bar line width
+DATA_ELW   = 2.0  # error-bar line width
 DATA_CAPS  = 3.5
 
 matplotlib.rcParams.update({
@@ -42,7 +38,7 @@ matplotlib.rcParams.update({
     "font.serif"          : ["Times New Roman", "DejaVu Serif"],
     "font.weight"         : "bold",
     "mathtext.fontset"    : "dejavuserif",
-    "mathtext.default"    : "bfit",      # bold *italic* math (H1 style)
+    "mathtext.default"    : "bfit",  # bold *italic* math (H1 style)
     "axes.labelsize"      : FS_ROWLAB,
     "axes.labelweight"    : "bold",
     "axes.titlesize"      : FS_TITLE,
@@ -62,23 +58,20 @@ matplotlib.rcParams.update({
     "legend.edgecolor"    : "0.45",
     "legend.fontsize"     : FS_LEGEND,
     "figure.dpi"          : 150,
-    "axes.linewidth"      : 3.2,     # bold panel boundaries
+    "axes.linewidth"      : 3.2,  # bold panel boundaries
 })
 
-# CONSTANTS
 N_TOTAL = 500_000_000
 
-C_DEFAULT = "#1f77b4"    # blue   - Pythia default PDF
-C_CT18    = "#d62728"    # red    - Pythia CT18 NLO
-C_CT18_REMNANT = "#9467bd" # purple - Pythia CT18 NLO + Remnant
-C_CT18_PTUNE = "#ff7f0e" # orange - Pythia CT18NLO+pythia Tune
-C_CT18_GLUON = "#17becf" # cyan  - Pythia CT18NLO+gluon
+C_DEFAULT = "#1f77b4"  # blue
+C_CT18    = "#d62728"  # red
+C_CT18_REMNANT = "#9467bd"  # purple
+C_CT18_PTUNE = "#ff7f0e"  # orange
+C_CT18_GLUON = "#17becf"  # cyan
 C_DATA    = "black"
 
-# Extra stroke width applied to the x / y axis labels so they render heavier
-# WITHOUT changing their font size. Raise for even bolder, 0.0 to disable.
 AXIS_LABEL_STROKE = 1.1
-C_JAM     = "navy"       # JAM21 raw histogram (no normalisation) - shared
+C_JAM     = "navy"  # JAM21 raw histogram (no normalisation)
 
 # Ordered list of (key, display label, color) used throughout
 PDF_SETS = [
@@ -89,15 +82,10 @@ PDF_SETS = [
     ("ct18gluon",   "CT18 NLO + Gluon",          C_CT18_GLUON),
 ]
 
-# Ordered list of (key, LHAPDF-set-name, display label, color) for the
-# pion PDF used to build the JAM21-style pi-N flux x F2^pi curve.
-# Only JAM21 is used - all other pion PDFs have been removed.
 PION_PDF_SETS = [
     ("jam21", "JAM21PionPDFnlo_pT", "JAM21", "navy"),
 ]
 
-# The publication overview grid needs all THREE pion PDFs.
-# Kept separate so the JAM21-only grids above are unchanged.
 PION_PDF_SETS_OVERVIEW = [
     ("jam21",   "JAM21PionPDFnlo",   "JAM21",   "#1f77b4"),  # blue
     ("xfitter", "xFitterPI_NLO_VAR", "xFitter", "#ff7f0e"),  # orange
@@ -149,10 +137,9 @@ XL_EDGES = np.array([0.32, 0.41, 0.50, 0.59, 0.68, 0.77, 0.86, 0.95])
 XL_CTRS  = 0.5 * (XL_EDGES[:-1] + XL_EDGES[1:])
 XL_XERR  = 0.5 * (XL_EDGES[1:]  - XL_EDGES[:-1])
 XL_BWS   = XL_EDGES[1:] - XL_EDGES[:-1]
-N_XL     = len(XL_CTRS)   # 7
+N_XL     = len(XL_CTRS)
 
 
-# HELPERS
 def pick(av, candidates):
     for c in candidates:
         if c in av: return c
@@ -181,11 +168,7 @@ def dsig_to_f2ln(dsig_per_xl, x, Q2, dx, dQ2):
     return np.asarray(dsig_per_xl, dtype=float) / (P * kin * dx * dQ2)
 
 
-# PYTHIA LOADER  (chunked / low-memory streaming - one call per PDF set)
-# Streams the tree in chunks with uproot.iterate() instead of loading every
-# branch into RAM at once. Memory use stays flat regardless of how many
-# events are in the ROOT file (only small per-cell histograms accumulate).
-CHUNK_STEP_SIZE = 200_000   # rows per chunk (plain int); lower further (e.g. 50_000) if still tight on RAM
+CHUNK_STEP_SIZE = 200_000
 
 def _peak_rss_mb():
     import resource
@@ -322,7 +305,6 @@ def process_all_pythia(paths):
     return results
 
 
-# H1 DATA
 def load_hdat_f2ln(path):
     raw  = np.loadtxt(path)
     Q2m  = raw[:, 0];  xBm = raw[:, 1];  xLc = raw[:, 2]
@@ -359,7 +341,6 @@ def load_hdat_f2ln(path):
     return {k: tuple(np.array(v) for v in vv) for k, vv in data.items()}
 
 
-# JAM21 NLO  (independent of the proton PDF set - computed once, shared)
 print("Loading JAM21PionPDFnlo (member 0) ...")
 _pdf_jam = lhapdf.mkPDF("JAM21PionPDFnlo", 0)
 print(f"  x=[{_pdf_jam.xMin:.2e}, {_pdf_jam.xMax:.2e}]  "
@@ -486,12 +467,6 @@ def rebin_jam21_to_xl_edges(jam_data, n_sub=12):
     return jam_hist
 
 
-# GENERIC PION-PDF LN FLUX x F2^pi  (works for any LHAPDF pion set)
-# compute_f2pi_minus_allflav_nlo() and f_piN_model_i() above already take a
-# generic `pdf` object / are PDF-independent, so the same physics is reused
-# here for MAP23Pion_PRVnlo, FANTO10_n15, xFitterPI_NLO_VAR, GRVPI1, etc.
-# Only the rebinned histogram (not the raw fine grid) is needed downstream
-# for plotting/fitting, so we skip the raw-grid step and rebin directly.
 def _pion_f2ln_pointwise(pdf_obj, xL, xbj, q2):
     x_pi = xbj / (1.0 - xL)
     if x_pi <= 0.0 or x_pi >= 1.0:
@@ -502,18 +477,15 @@ def _pion_f2ln_pointwise(pdf_obj, xL, xbj, q2):
 try:
     import f2pi_nlo
     _HAVE_GPU_PATH = True
-except Exception as _e:                                  # pragma: no cover
+except Exception as _e:
     print(f"  NOTE: f2pi_nlo unavailable ({_e}); using the slow CPU path.")
     _HAVE_GPU_PATH = False
 
-# Set to False to force the original scipy.quad implementation.
+# Set to False to force the original scipy.quad implementation
 USE_FAST_F2PI = True
 
 
 def rebin_pion_to_xl_edges(pdf_obj, n_sub=12, label="pion"):
-    """Batched (GPU/vectorised) rebin, falling back to the original
-    scipy.quad loop if f2pi_nlo can't be imported or USE_FAST_F2PI is off.
-    """
     if USE_FAST_F2PI and _HAVE_GPU_PATH:
         print(f"    [{label}] backend: {f2pi_nlo.backend_name()}", flush=True)
         return f2pi_nlo.rebin_pion_to_xl_edges_fast(
@@ -523,9 +495,7 @@ def rebin_pion_to_xl_edges(pdf_obj, n_sub=12, label="pion"):
 
 
 def rebin_pion_to_xl_edges_cpu(pdf_obj, n_sub=12):
-    """Original per-point scipy.quad implementation. Kept as the reference
-    the batched path is verified against.
-    """
+    """Original per-point scipy.quad implementation."""
     jam_hist = {}
     for ix, xbj in enumerate(X_MEANS):
         for iq, q2 in enumerate(Q2_MEANS):
@@ -540,9 +510,6 @@ def rebin_pion_to_xl_edges_cpu(pdf_obj, n_sub=12):
 
 
 def load_pion_pdf_hists(pion_pdf_sets=PION_PDF_SETS, skip_keys=()):
-    """Loads every pion PDF in `pion_pdf_sets` via LHAPDF (member 0) and builds
-    its rebinned F2LN histogram per (iq, ix) cell.
-    """
     hists = {}
     for key, pdfname, label, _ in pion_pdf_sets:
         if key in skip_keys:
@@ -558,12 +525,8 @@ def load_pion_pdf_hists(pion_pdf_sets=PION_PDF_SETS, skip_keys=()):
     return hists
 
 
-# SUM MODEL:  model_k = Pythia_k + JAM21_hist   (raw sum - NO normalisation,
-# no fitting, no scaling factor of any kind is applied anywhere)
 def compute_sum_model(f2ln_py, jam_hist):
-    """Returns sum_model[(iq,ix)] = py + jam_hist, for cells with both.
-    This is a plain element-wise sum - no scaling factor of any kind.
-    """
+    """Returns sum_model[(iq,ix)] = py + jam_hist, for cells with both."""
     sum_model = {}
     for cell, py in f2ln_py.items():
         jh = jam_hist.get(cell)
@@ -592,10 +555,6 @@ def compute_chi2(sum_model, h1_data):
 
 
 def finalize_pdf_set(results, jam_hist, h1_data):
-    """For every PDF set in `results`, builds the plain sum
-    Pythia_k + JAM21_hist (no scaling factor at all), computes chi^2/n for
-    reference, and stores them back onto the same dict in-place.
-    """
     for key, label, _ in PDF_SETS:
         if key not in results:
             continue
@@ -610,15 +569,7 @@ def finalize_pdf_set(results, jam_hist, h1_data):
         r["chi2"] = chi2_table
 
 
-# OVERALL CHI^2  (summed across every cell/point, not the per-cell
-# average used by compute_chi2() above - this is the total chi^2 and
-# point count N for each PDF set's Pythia_k + JAM21 sum curve vs H1)
 def compute_overall_chi2(results, h1_data):
-    """For every PDF set in `results`, compute the overall chi^2 (summed
-    over ALL H1 data points across ALL cells) of H1 data vs. the summed
-    curve  Pythia_k + JAM21  - i.e. r["sum_model"], the exact curve drawn
-    as the dashed "+JAM21" line in _draw_cell().
-    """
     out = {}
     for key, label, _ in PDF_SETS:
         if key not in results:
@@ -653,9 +604,7 @@ def compute_overall_chi2(results, h1_data):
 
 
 def save_chi2_table(results, out_path, title=""):
-    """Write an overall chi^2 summary (one row per PDF-set curve) to a
-    plain-text file.
-    """
+    """Write an overall chi^2 summary (one row per PDF-set curve) to a plain-text file."""
     with open(out_path, "w") as f:
         if title:
             f.write(f"{title}\n")
@@ -669,7 +618,6 @@ def save_chi2_table(results, out_path, title=""):
     print(f"  → {out_path}")
 
 
-# CELL DRAWING  (with the sum curve, for 3 PDF sets)
 def _draw_cell(ax, results, cell, h1_cell, jam_hist_cell,
                compact=True, sum_only=False):
     """Draw one (Q^2, x_B) cell onto ax."""
@@ -685,13 +633,12 @@ def _draw_cell(ax, results, cell, h1_cell, jam_hist_cell,
         sum_cell  = r.get("sum_model", {}).get(cell)
         chi2_cell = r.get("chi2", {}).get(cell)
 
-        # -- raw Pythia step-histogram --------------------------------
+        # raw Pythia step-histogram
         if not sum_only and py is not None:
             lbl = (rf"{label} $N={n:,}$" if compact
                    else rf"{label}  $N={n:,}$,  $\sigma={sig:.3f}\ \mathrm{{nb}}$")
             ax.stairs(py, XL_EDGES, color=color, lw=1.3, label=lbl)
 
-        # -- sum curve  Pythia_k + JAM21_hist  (plain sum, no normalisation) --
         if sum_cell is not None:
             c2n = chi2_cell if chi2_cell is not None else float('nan')
             lbl = (rf"{label}+JAM21 $\chi^2/n={c2n:.2f}$" if compact
@@ -699,12 +646,12 @@ def _draw_cell(ax, results, cell, h1_cell, jam_hist_cell,
             ax.stairs(sum_cell, XL_EDGES, color=color, lw=2.0, ls='--',
                       label=lbl, alpha=0.9)
 
-    # -- JAM21 histogram (raw, no normalisation) - shared, drawn once --
+    # JAM21 histogram (raw, no normalisation)
     if not sum_only and jam_hist_cell is not None:
         ax.stairs(jam_hist_cell, XL_EDGES, color=C_JAM, lw=1.3, ls='-',
                   label="JAM21 (hist, no norm.)")
 
-    # -- H1 data ---------------------------------------------------
+    # H1 data
     if h1_cell is not None:
         xL_h1, F2_h1, stat_h1, tot_h1 = h1_cell
         ax.errorbar(xL_h1, F2_h1, xerr=XL_XERR[:len(xL_h1)], yerr=tot_h1,
@@ -722,7 +669,6 @@ def _draw_cell(ax, results, cell, h1_cell, jam_hist_cell,
               borderpad=0.3, framealpha=0.85, labelspacing=0.2)
 
 
-# PLOT - 7x7 GRID  (shared skeleton for the full grid and the sum-only grid)
 def _make_grid_generic(results, h1_data, jam_hist, out, suffix, title, sum_only):
     fig, axes = plt.subplots(NX, NQ,
                              figsize=(NQ * 3.0, NX * 2.6),
@@ -773,7 +719,6 @@ def make_grid(results, h1_data, jam_hist, out):
 
 
 def make_grid_sum_only(results, h1_data, jam_hist, out):
-    """Extra 7x7 grid with ONLY the raw sum curves Pythia_k+JAM21 (no normalisation) vs H1."""
     title = (rf"$F_{{2LN}}(x_L)$ — raw sum $\mathrm{{Py}}_k+\mathrm{{JAM21}}$ (no normalisation)"
               rf" (default/CT18 NLO/CT18 NLO+Remnant/CT18NLO+pythia Tune/CT18NLO+gluon) vs H1 data"
               rf"$\quad p_T<{PT_MAX}\ \mathrm{{GeV}}$")
@@ -781,17 +726,10 @@ def make_grid_sum_only(results, h1_data, jam_hist, out):
                        suffix="_sumonly", title=title, sum_only=True)
 
 
-# PLOT - DIS BACKGROUND (Pythia only) and DIS BACKGROUND + JAM21 GRIDS
-#   * no sum curves, no chi^2 anywhere
-#   * legend shown ONLY on the first (top-left) panel
-#   * no overall figure title / suptitle
-#   * bold axis labels + bold tick labels, white backgrounds
 def _draw_cell_bg(ax, results, cell, h1_cell, jam_hist_cell,
                    include_pythia, include_jam, include_sum, compact=True):
-    """Draw one (Q^2, x_B) cell. Which curves appear is controlled by three
-    independent switches:
-    """
-    # -- raw Pythia step-histograms (DIS background) -------------------
+    """Draw one (Q^2, x_B) cell."""
+    # raw Pythia step-histograms (DIS background)
     if include_pythia:
         for key, label, color in PDF_SETS:
             if key not in results:
@@ -801,12 +739,12 @@ def _draw_cell_bg(ax, results, cell, h1_cell, jam_hist_cell,
                 ax.stairs(py, XL_EDGES, color=color, lw=LW_PYTHIA,
                           label=_pythia_label(label))
 
-    # -- raw JAM21 pion histogram (shared, no normalisation) -----------
+    # raw JAM21 pion histogram (shared, no normalisation)
     if include_jam and jam_hist_cell is not None:
         ax.stairs(jam_hist_cell, XL_EDGES, color=C_JAM, lw=LW_JAM, ls='-',
                   label="JAM21")
 
-    # -- summed model  Pythia_k + JAM21  (the "added" curves) ----------
+    # summed model  Pythia_k + JAM21  (the "added" curves)
     if include_sum:
         for key, label, color in PDF_SETS:
             if key not in results:
@@ -816,30 +754,23 @@ def _draw_cell_bg(ax, results, cell, h1_cell, jam_hist_cell,
                 ax.stairs(sum_cell, XL_EDGES, color=color, lw=LW_SUM, ls='-',
                           label=f"{_pythia_label(label)} + JAM21")
 
-    # -- H1 data -------------------------------------------------------
+    # H1 data
     if h1_cell is not None:
         xL_h1, F2_h1, stat_h1, tot_h1 = h1_cell
-        # EXACTLY the H1 / ZEUS data-point style: filled black circles with a
-        # single VERTICAL (total) error bar -- no horizontal x error bars,
-        # which is what previously made these look like crosses instead of dots.
         ax.errorbar(xL_h1, F2_h1, yerr=tot_h1,
                     fmt="o", ms=DATA_MS, mfc="black", mec="black",
                     mew=DATA_MEW, ecolor="black", elinewidth=DATA_ELW,
                     capsize=DATA_CAPS, capthick=DATA_ELW,
                     color="black", zorder=10, label="H1 data")
 
-    # x range extended to 1.0 so the "1" tick has somewhere to sit
-    # (the x_L bins only reach 0.95).
     ax.set_xlim(XL_EDGES[0] - 0.02, 1.0)
     ax.set_ylim(0., 0.14)
     ax.set_facecolor("white")
 
-    # Bold panel boundary.
+    # Bold panel boundary
     for sp in ax.spines.values():
         sp.set_linewidth(SPINE_LW)
 
-    # Ticks kept off the panel edges: with wspace=hspace=0 the panels share
-    # borders, so an end label would collide with the neighbour's.
     ax.set_xticks([0.50, 0.75, 1.00])
     ax.xaxis.set_major_formatter(FuncFormatter(_xl_tick_fmt))
     ax.set_yticks([0.03, 0.06, 0.09, 0.12])
@@ -854,14 +785,7 @@ def _draw_cell_bg(ax, results, cell, h1_cell, jam_hist_cell,
     plt.setp(ax.get_yticklabels(), fontweight="bold")
 
 
-# FIGURE-LEVEL LEGEND placed in the largest empty corner of the grid
 def _largest_corner_empty_block(cell_has_data):
-    """Return the list of (row, iq) cells forming the largest fully-empty
-    rectangle anchored at either the bottom-right or the top-left corner
-    of the grid (whichever is bigger). The staircase kinematic layout
-    always leaves those two corners empty, so this is where the legend
-    can live without covering any panel.
-    """
     def _all_empty(cells):
         return all(not cell_has_data.get(c, False) for c in cells)
 
@@ -874,11 +798,7 @@ def _largest_corner_empty_block(cell_has_data):
 
 
 def _largest_empty_block_at(cell_has_data, corner="top-left"):
-    """Largest fully-empty rectangle of (row, iq) cells anchored at one corner
-    of the grid. The staircase kinematic layout always leaves the top-left
-    and bottom-right corners empty, which is where the F_2^LN label and the
-    legend live.
-    """
+    """Largest fully-empty rectangle of (row, iq) cells anchored at one corner of the grid."""
     def _all_empty(cells):
         return all(not cell_has_data.get(c, False) for c in cells)
 
@@ -914,22 +834,18 @@ def _block_centre(axes, block):
 
 def _place_f2_label_top_left(fig, axes, cell_has_data, text, fontsize,
                              stroke=None):
-    """Put the F_2^LN axis label INSIDE the empty top-left staircase corner,
-    horizontal -- the way the published H1 figure does it -- instead of
-    rotated out at the far left figure margin. Also places "H1" label above it.
-    """
     block = _largest_empty_block_at(cell_has_data, "top-left")
     if not block:
         return False
 
     cx, cy = _block_centre(axes, block)
-    
+
     # Place "H1" label above F_2LN label
     t_h1 = fig.text(cx, cy + 0.08, "H1", ha="center", va="center",
                     fontsize=fontsize, fontweight="bold")
     if stroke:
         t_h1.set_path_effects(stroke)
-    
+
     # Place F_2LN label below H1
     t = fig.text(cx, cy, text, ha="center", va="center",
                  fontsize=fontsize, fontweight="bold")
@@ -939,9 +855,6 @@ def _place_f2_label_top_left(fig, axes, cell_has_data, text, fontsize,
 
 
 def _place_legend_in_empty_space(fig, axes, cell_has_data, source_ax):
-    """Grab the curve handles from a populated panel and draw one big, bold
-    legend centred in the largest empty corner block.
-    """
     handles, labels = source_ax.get_legend_handles_labels()
     if not handles:
         return
@@ -983,31 +896,21 @@ def _place_legend_in_empty_space(fig, axes, cell_has_data, source_ax):
 
 
 def _pythia_label(label):
-    """'CT18 NLO' -> 'Pythia (CT18 NLO)', but leave names that already say
-    Pythia alone (otherwise 'Pythia default' becomes the silly
-    'Pythia (Pythia default)').
-    """
     return label if label.strip().lower().startswith("pythia") else f"Pythia ({label})"
 
 
 def _xl_tick_fmt(v, pos):
-    """Bold x_L tick labels: 0.50, 0.75, 1 -- whole numbers lose the
-    trailing '.00' (H1 style).
-    """
     if abs(v - round(v)) < 1e-9:
         return rf"$\mathbf{{{int(round(v))}}}$"
     return rf"$\mathbf{{{v:.2f}}}$"
 
 
 def _q2_label_bold(lo, hi):
-    # No "GeV^2" -- it made the title wider than the panel, so neighbouring
-    # column titles ran into each other.
+    # No "GeV^2"
     return rf"$Q^2 \in [{lo:.4g},\,{hi:.4g}]$"
 
 
 def _xb_label_bold(lo, hi):
-    # Horizontal, split over TWO lines so it stays narrow enough to sit in
-    # the empty cell to the left of each row without overlapping anything.
     return rf"$x_B \in [{sci(lo)},$" + "\n" + rf"${sci(hi)}]$"
 
 
@@ -1018,18 +921,14 @@ def _make_grid_bg_generic(results, h1_data, jam_hist, out, suffix,
                              gridspec_kw=dict(wspace=0.0, hspace=0.0),
                              sharex=False, sharey=False)
     fig.patch.set_facecolor("white")
-    # No fig.suptitle(...) - no overall header, per spec.
+    # No fig.suptitle(...)
 
-    # -- which (row, iq) panels actually have H1 data points --------
     cell_has_data = {}
     for ix in range(NX):
         row = NX - 1 - ix
         for iq in range(NQ):
             cell_has_data[(row, iq)] = h1_data.get((iq, ix)) is not None
 
-    # first panel (reading order: top row -> bottom, left -> right)
-    # that has data - that's where the legend goes, since the true
-    # top-left panel may itself be empty and get hidden below.
     legend_cell = None
     for row in range(NX):
         for iq in range(NQ):
@@ -1039,19 +938,15 @@ def _make_grid_bg_generic(results, h1_data, jam_hist, out, suffix,
         if legend_cell is not None:
             break
 
-    # bottom-most / top-most / left-most data-bearing panel in each
-    # column/row - since empty panels are hidden, titles, y-labels,
-    # and tick labels must latch onto whichever panel is actually
-    # visible at each grid edge, not the fixed row-0 / col-0 slot.
-    last_visible_row  = {}   # per column: bottom-most visible row  -> x ticks
-    first_visible_row = {}   # per column: top-most visible row     -> Q^2 title
+    last_visible_row  = {}
+    first_visible_row = {}
     for iq in range(NQ):
         rows_with_data = [row for row in range(NX) if cell_has_data[(row, iq)]]
         if rows_with_data:
             first_visible_row[iq] = min(rows_with_data)
             last_visible_row[iq]  = max(rows_with_data)
 
-    first_visible_col = {}   # per row: left-most visible column -> x_B label + y ticks
+    first_visible_col = {}
     for row in range(NX):
         cols_with_data = [iq for iq in range(NQ) if cell_has_data[(row, iq)]]
         if cols_with_data:
@@ -1064,7 +959,7 @@ def _make_grid_bg_generic(results, h1_data, jam_hist, out, suffix,
             ax   = axes[row, iq]
             cell = (iq, ix)
 
-            # -- drop empty panels entirely - no data, no plot -------
+            # drop empty panels entirely
             if not cell_has_data[(row, iq)]:
                 ax.set_visible(False)
                 continue
@@ -1087,14 +982,8 @@ def _make_grid_bg_generic(results, h1_data, jam_hist, out, suffix,
                 ax.set_title(_q2_label_bold(q2lo, q2hi), fontsize=FS_TITLE,
                             pad=9, fontweight="bold")
 
-            # x_B label + y tick labels on the left-most visible panel of this row
             if iq == first_visible_col.get(row):
                 xlo, xhi = X_BINS[ix]
-                # Horizontal, two-line label parked in the empty cell to the
-                # left of this row. set_ylabel would rotate it 90 deg and
-                # stack every row's label on the same figure-left strip,
-                # which makes them overlap each other. x = -0.26 clears the
-                # y tick numbers.
                 ax.text(-0.26, 0.5, _xb_label_bold(xlo, xhi),
                         transform=ax.transAxes, ha="right", va="center",
                         rotation=0, linespacing=1.4,
@@ -1103,27 +992,19 @@ def _make_grid_bg_generic(results, h1_data, jam_hist, out, suffix,
             else:
                 ax.tick_params(labelleft=False)
 
-            # x tick labels only on the bottom-most visible panel of this column
             ax.tick_params(labelbottom=(row == last_visible_row.get(iq)))
 
-    # -- one big, bold legend in the largest empty corner of the grid --
+    # one big, bold legend in the largest empty corner of the grid
     if legend_source_ax is not None:
         _place_legend_in_empty_space(fig, axes, cell_has_data, legend_source_ax)
 
-    # -- global, bold axis labels, anchored to the *visible* panel block --
-    # fig.supx/ylabel sit at the figure margins, which fall far out in the
-    # empty staircase corners. Instead we place the labels just outside the
-    # tight bounding box of the visible panels (which already includes their
-    # tick labels and row/column labels), so they hug the plotted region.
     from matplotlib.transforms import Bbox
     vis = [ax for ax in axes.flat if ax.get_visible()]
 
-    # plot-area centre (bare axes positions, for centring the labels)
     pos = [ax.get_position() for ax in vis]
     cx = 0.5 * (min(p.x0 for p in pos) + max(p.x1 for p in pos))
     cy = 0.5 * (min(p.y0 for p in pos) + max(p.y1 for p in pos))
 
-    # outer edge of everything drawn (axes + their tick / row / column labels)
     try:
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
@@ -1136,9 +1017,6 @@ def _make_grid_bg_generic(results, h1_data, jam_hist, out, suffix,
         uy0 = min(p.y0 for p in pos) - 0.03
 
     pad = 0.010
-    # Same font size as before, but stroked so the glyphs render heavier and
-    # read clearly against the big grid (mathtext has no weight above bold,
-    # so extra weight has to come from a stroke).
     _lbl_stroke = [patheffects.withStroke(linewidth=AXIS_LABEL_STROKE,
                                           foreground="black")]
 
@@ -1147,9 +1025,6 @@ def _make_grid_bg_generic(results, h1_data, jam_hist, out, suffix,
                    fontweight="bold")
     t_x.set_path_effects(_lbl_stroke)
 
-    # F_2^LN goes INSIDE the empty top-left staircase corner (H1 style),
-    # horizontal. Only if that corner does not exist do we fall back to the
-    # old rotated label out at the left figure margin.
     _f2_text = r"$F_{2}^{LN}(x_B,\,Q^{2},\,x_L)$"
     if not _place_f2_label_top_left(fig, axes, cell_has_data, _f2_text,
                                     FS_AXLABEL, stroke=_lbl_stroke):
@@ -1166,9 +1041,6 @@ def _make_grid_bg_generic(results, h1_data, jam_hist, out, suffix,
 
 
 def make_grid_bg_only(results, h1_data, jam_hist, out):
-    """7x7 grid: ONLY the raw Pythia (DIS background) curves (all six PDF
-    sets) vs H1 data. No JAM21, no sum curves, no chi^2, no header.
-    """
     _make_grid_bg_generic(results, h1_data, jam_hist, out,
                           suffix="_dis_background_only",
                           include_pythia=True, include_jam=False,
@@ -1176,17 +1048,12 @@ def make_grid_bg_only(results, h1_data, jam_hist, out):
 
 
 def make_grid_bg_jam(results, h1_data, jam_hist, out):
-    """7x7 grid: ONLY the summed model  Pythia_k + JAM21  (the "added"
-    curves, one per PDF set, no normalisation) vs H1 data. No separate
-    raw Pythia or raw JAM21 curves, no chi^2, no header.
-    """
     _make_grid_bg_generic(results, h1_data, jam_hist, out,
                           suffix="_dis_background_jam21",
                           include_pythia=False, include_jam=False,
                           include_sum=True)
 
 
-# PLOT - 49 INDIVIDUAL CELL PLOTS
 def make_individual(results, h1_data, jam_hist, out):
     ind_dir = f"{out}_f2ln_individual"
     os.makedirs(ind_dir, exist_ok=True)
@@ -1215,11 +1082,7 @@ def make_individual(results, h1_data, jam_hist, out):
     print(f"  → {ind_dir}/  ({NQ*NX} plots)")
 
 
-# COMBINED OVERVIEW  -  every (pion PDF x Pythia PDF) combination
 def average_over_cells(model_dict, h1_data):
-    """Simple unweighted average of a per-cell model dict over every cell
-    that also has H1 data, giving one representative x_L curve.
-    """
     total = np.zeros(N_XL); n = 0
     for cell, model in model_dict.items():
         if cell in h1_data:
@@ -1228,9 +1091,6 @@ def average_over_cells(model_dict, h1_data):
 
 
 def average_h1(h1_data):
-    """Inverse-variance-weighted average of all H1 points, rebinned onto
-    XL_EDGES, collapsing every (Q2, x_B) cell onto one representative curve.
-    """
     sum_wf = np.zeros(N_XL); sum_w = np.zeros(N_XL)
     for xL_h1, F2_h1, _stat, tot_h1 in h1_data.values():
         idx = np.clip(np.searchsorted(XL_EDGES[1:], xL_h1, side='left'), 0, N_XL - 1)
@@ -1246,11 +1106,6 @@ def average_h1(h1_data):
 
 def make_master_overview(combo_results, h1_data, out,
                           pion_pdf_sets=PION_PDF_SETS, pdf_sets=PDF_SETS):
-    """One figure, one panel per (pion PDF, Pythia PDF) combination:
-    rows = pion PDFs, columns = Pythia PDF sets. Each panel shows the
-    cell-averaged raw sum curve (Py+pion), with no overall normalisation,
-    against the cell-averaged H1 data.
-    """
     h1_avg, h1_err = average_h1(h1_data)
     valid = ~np.isnan(h1_avg)
 
@@ -1298,43 +1153,20 @@ def make_master_overview(combo_results, h1_data, out,
     plt.close(fig)
 
 
-# PUBLICATION-STYLE OVERVIEW GRID  (all combinations, H1)
-#   3 rows  = pion PDFs      (JAM21 / xFitter / GRV)
-#   5 cols  = Pythia proton PDF sets
-#   Every panel shows exactly three model curves plus the data:
-#       * DIS fragmentation  -- cell-averaged Pythia   F_2^LN
-#       * PDF average        -- cell-averaged pion-PDF F_2^LN
-#       * Total              -- their sum
-#       * H1 (avg)           -- inverse-variance cell-average of the data
-#   House style: bold serif, heavy panel boxes, panels
-#   touching edge-to-edge, universal x_L / F_2^LN(x_B,Q^2,x_L) axis labels,
-#   one shared legend, and per-panel chi^2/N only.
-#   This is the H1 twin of the ZEUS grid in zeus_three_pions.py -- same layout, same
-#   colours, H1 binning and H1 y-range.
-
-# ONE colour scheme, reused identically in every panel (deliberately NOT
-# coloured per Pythia set -- the columns are told apart by their headings,
-# not by hue). Line styles differ too, so it survives greyscale printing.
-C_DIS_OV   = "#1f77b4"   # DIS fragmentation  (Pythia proton PDF)
-C_PDFAV_OV = "#2ca02c"   # PDF average        (pion PDF)
-C_TOTAL_OV = "#d62728"   # Total = DIS + PDF
+C_DIS_OV   = "#1f77b4"  # DIS fragmentation  (Pythia proton PDF)
+C_PDFAV_OV = "#2ca02c"  # PDF average        (pion PDF)
+C_TOTAL_OV = "#d62728"
 
 LS_DIS_OV, LS_PDFAV_OV, LS_TOTAL_OV = "--", "-.", "-"
 
-# The 7x7 grids can afford FS_TITLE=28, but five long column headings
-# ("CT18 NLO + Remnant" ...) collide at that size, so this grid uses its own.
 FS_TITLE_OV = 22
 
-# The chi^2/N box is an annotation, not a heading -- at FS_LEGEND (24) it
-# dominates the panel and crowds the curves, so it gets its own size.
 FS_CHI2_OV = 15
 
-# H1 F_2^LN reaches ~0.12; 0.14 ceiling.
+# H1 F_2^LN reaches ~0.12; 0.14 ceiling
 OVERVIEW_YLIM   = (0.0, 0.14)
-OVERVIEW_XTICKS = [0.4, 0.6, 0.8]          # interior ticks only: with
-OVERVIEW_YTICKS = [0.03, 0.06, 0.09, 0.12]  # wspace=hspace=0 the panels
-                                            # touch, so an edge tick would
-                                            # collide with the neighbour.
+OVERVIEW_XTICKS = [0.4, 0.6, 0.8]
+OVERVIEW_YTICKS = [0.03, 0.06, 0.09, 0.12]
 
 
 def _ov_tick_fmt(v, pos):
@@ -1345,11 +1177,6 @@ def _ov_tick_fmt(v, pos):
 
 
 def _average_pair_over_cells(py_dict, pion_dict, h1_data):
-    """Cell-average the Pythia (DIS fragmentation) and pion (PDF average)
-    F_2^LN histograms over every (Q^2, x_B) cell that carries an H1
-    measurement, counting -- in each x_L bin independently -- only the
-    cells where BOTH curves are finite.
-    """
     s_dis = np.zeros(N_XL)
     s_pdf = np.zeros(N_XL)
     n_cnt = np.zeros(N_XL)
@@ -1376,10 +1203,6 @@ def _average_pair_over_cells(py_dict, pion_dict, h1_data):
 
 
 def _chi2_total_over_cells(py_dict, pion_dict, h1_data):
-    """Overall chi^2 and N of the H1 points against the per-cell Total
-    (Pythia + pion), accumulated over the whole grid, using the TOTAL
-    (stat (+) syst) error as the weight.
-    """
     chi2 = 0.0
     ndof = 0
     for cell, h1_cell in h1_data.items():
@@ -1424,16 +1247,12 @@ def make_publication_overview_grid(pythia_dict, pion_hists, h1_data, out,
     h1_avg, h1_err = average_h1(h1_data)
     hvalid = np.isfinite(h1_avg) & np.isfinite(h1_err)
 
-    # Panels touch edge-to-edge (H1 staircase convention). Panel size matches
-    # the 7x7 grids, so the shared FS_* sizes stay consistent between figures.
     fig, axes = plt.subplots(
         n_pion, n_py,
         figsize=(n_py * 4.8, n_pion * 4.0),
         gridspec_kw=dict(wspace=0.0, hspace=0.0),
         sharex=True, sharey=True, squeeze=False)
     fig.patch.set_facecolor("white")
-    # Default subplot margins leave ~12% blank above the titles, which would
-    # open a dead gap under the shared legend.
     fig.subplots_adjust(left=0.085, right=0.985, top=0.935, bottom=0.075,
                         wspace=0.0, hspace=0.0)
 
@@ -1474,7 +1293,6 @@ def make_publication_overview_grid(pythia_dict, pion_hists, h1_data, out,
             if legend_src is None and pion_dict is not None:
                 legend_src = ax
 
-            # the ONLY per-panel annotation: chi^2/N
             if ndof > 0:
                 ax.text(0.965, 0.955, rf"$\chi^2/N = {chi2 / ndof:.2f}$",
                         transform=ax.transAxes, ha="right", va="top",
@@ -1513,7 +1331,6 @@ def make_publication_overview_grid(pythia_dict, pion_hists, h1_data, out,
                             ha="center", va="center", rotation=90,
                             fontsize=FS_ROWLAB, fontweight="bold"))
 
-    # ---- ONE shared legend, above the grid (never repeated per panel) --
     if legend_src is not None:
         handles, labels = legend_src.get_legend_handles_labels()
         seen, h2, l2 = set(), [], []
@@ -1549,8 +1366,6 @@ def make_publication_overview_grid(pythia_dict, pion_hists, h1_data, out,
         uy0 = min(p.y0 for p in pos) - 0.03
 
     pad = 0.012
-    # Same font size, stroked so the glyphs render heavier (mathtext has no
-    # weight above bold) -- identical trick to the 7x7 grids.
     _lbl_stroke = [patheffects.withStroke(linewidth=AXIS_LABEL_STROKE,
                                           foreground="black")]
 
@@ -1558,8 +1373,6 @@ def make_publication_overview_grid(pythia_dict, pion_hists, h1_data, out,
                    fontsize=FS_AXLABEL, fontweight="bold")
     t_x.set_path_effects(_lbl_stroke)
 
-    # The row headings (JAM21 / xFitter / GRV) live in the left margin, so
-    # anchor the universal y label outside THEM, not merely outside the axes.
     y_anchor = ux0
     if renderer is not None:
         try:
@@ -1583,7 +1396,6 @@ def make_publication_overview_grid(pythia_dict, pion_hists, h1_data, out,
     plt.close(fig)
 
 
-# MAIN
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -1615,37 +1427,34 @@ def main():
               "ct18remnant": args.ct18remnant, "ct18ptune": args.ct18ptune,
               "ct18gluon": args.ct18gluon}
 
-    # -- H1 data ----------------------------------------------------
+    # H1 data
     print(f"Loading H1 data from {args.hdat} ...")
     h1_data = load_hdat_f2ln(args.hdat)
     print(f"  Loaded {len(h1_data)} cells")
 
-    # -- JAM21 NLO (shared across all PDF sets) --------------------
+    # JAM21 NLO (shared across all PDF sets)
     print("\nComputing JAM21 NLO F_2LN curves ...")
     jam_data = load_jam21_f2ln()
 
     print("\nRebinning JAM21 onto XL_EDGES ...")
     jam_hist = rebin_jam21_to_xl_edges(jam_data)
 
-    # -- Pythia (six PDF sets, each streamed in chunks) --------------
     results = process_all_pythia(paths)
     if not results:
         raise SystemExit("No input ROOT files were loaded — nothing to plot.")
 
-    # -- build the summed model  Pythia_k + JAM21  (no normalisation) --
-    # This attaches results[key]["sum_model"] used by the second grid.
     print("\nBuilding summed model  Pythia + JAM21  (no normalisation) ...")
     finalize_pdf_set(results, jam_hist, h1_data)
 
-    # -- DIS background only (raw Pythia, all six sets) vs H1 --------
+    # DIS background only (raw Pythia, all six sets) vs H1
     print("\nSaving DIS background-only 7×7 grid ...")
     make_grid_bg_only(results, h1_data, jam_hist, args.out)
 
-    # -- Summed  Pythia + JAM21  (added curves, all six sets) vs H1 --
+    # Summed  Pythia + JAM21  (added curves, all six sets) vs H1
     print("\nSaving summed  Pythia + JAM21  7×7 grid ...")
     make_grid_bg_jam(results, h1_data, jam_hist, args.out)
 
-    # -- overall chi^2: H1 data vs. each Pythia_k + JAM21 sum ---------
+    # overall chi^2: H1 data vs. each Pythia_k + JAM21 sum
     print("\nComputing overall chi^2 for each Pythia PDF set + JAM21 ...")
     overall_chi2 = compute_overall_chi2(results, h1_data)
     save_chi2_table(
@@ -1654,7 +1463,7 @@ def main():
         title="Overall chi^2: H1 data vs. Pythia PDF-set + JAM21 curves",
     )
 
-    # -- publication overview grid: 3 pion PDFs x 5 Pythia PDF sets --
+    # publication overview grid: 3 pion PDFs x 5 Pythia PDF sets
     print("\n" + "=" * 70)
     print("Generating publication-style overview grid ...")
     print("=" * 70)

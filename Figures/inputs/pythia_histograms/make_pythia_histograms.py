@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""Read the Pythia ROOT trees in chunks, apply the H1 or ZEUS cuts and count the events in
-the (Q^2, x_B, x_L) bins. Output: hists/<EXPT>_<config>.npz.
-
-Usage: python3 make_pythia_histograms.py [H1|ZEUS]
-"""
 
 import os
 PYTHIA_OUT = os.environ.get("PYTHIA_OUT", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "Pythia", "output"))
@@ -17,7 +11,7 @@ import uproot
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = HERE
-STEP = 1_000_000                       # entries per chunk
+STEP = 1_000_000  # entries per chunk
 
 DEG = np.pi / 180.0
 CONFIG = {
@@ -47,7 +41,6 @@ CONFIG = {
 
 
 def cuts(expt, c):
-    """(kinematic selection, + P_T selection) -- h1_five_settings.py and zeus_three_pions.py."""
     if expt == "H1":
         sel = ((c["Q2"] >= 6.0) & (c["Q2"] <= 100.0)
                & (c["xB"] >= 1.5e-4) & (c["xB"] <= 3.0e-2)
@@ -79,7 +72,7 @@ def process(expt, key, label, path):
     with uproot.open(path) as f:
         sigma = float(f["sigmaGen_nb"].members["fVal"])
         ngen = float(f["nGenerated"].members["fVal"]) if "nGenerated" in f else float("nan")
-        tree = f["tree"]                                   # highest cycle (as the original scripts)
+        tree = f["tree"]  # highest cycle (as the original scripts)
         n_tot = tree.num_entries
         print(f"[{expt}/{key}] {label}: {path}\n    tree;{tree.name} {n_tot:,} entries, "
               f"sigmaGen = {sigma:.4f} nb, nGenerated = {ngen:,.0f}", flush=True)

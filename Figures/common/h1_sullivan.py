@@ -1,15 +1,7 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""H1 part of Fig. 9: three pion PDFs times five Pythia settings.
-
-The physics and plotting code is taken from h1_five_settings.py; the Pythia part
-comes from hists/H1_*.npz. --mode previous uses the inputs of the submitted version,
---mode new the JAM21 replica mean and the refitted Lambda for xFitter and GRV.
-"""
+"""H1 part of Fig. 9: three pion PDFs times five Pythia settings."""
 import os, sys
 
-
-# from h1_five_settings.py: imports, style, constants, binning, helpers
 
 import argparse, os, warnings, gc
 PYTHIA_OUT = os.environ.get("PYTHIA_OUT", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Pythia", "output"))
@@ -26,21 +18,20 @@ from scipy.integrate import quad
 
 warnings.filterwarnings('ignore')
 
-# FONT SIZES / WEIGHTS -- house style.
-# Scaled up for the large 4.8 x 4.0 inch staircase panels.
-FS_AXLABEL = 42     # F_2^LN(...) and x_L axis labels
-FS_TITLE   = 28     # Q^2 column titles
-FS_ROWLAB  = 26     # x_B row labels
-FS_TICK    = 24     # x and y tick numbers
-FS_LEGEND  = 24     # the one shared corner legend
+# FONT SIZES / WEIGHTS
+FS_AXLABEL = 42  # F_2^LN(...) and x_L axis labels
+FS_TITLE   = 28  # Q^2 column titles
+FS_ROWLAB  = 26  # x_B row labels
+FS_TICK    = 24  # x and y tick numbers
+FS_LEGEND  = 24  # the one shared corner legend
 
-SPINE_LW   = 3.2    # panel box -- deliberately heavy
-LW_PYTHIA  = 2.6    # raw Pythia (DIS background) histograms
-LW_JAM     = 3.2    # raw JAM21 pion histogram
-LW_SUM     = 3.2    # Pythia + JAM21 sums
-DATA_MS    = 7.0    # H1 marker size
+SPINE_LW   = 3.2  # panel box
+LW_PYTHIA  = 2.6  # raw Pythia (DIS background) histograms
+LW_JAM     = 3.2  # raw JAM21 pion histogram
+LW_SUM     = 3.2  # Pythia + JAM21 sums
+DATA_MS    = 7.0  # H1 marker size
 DATA_MEW   = 1.5
-DATA_ELW   = 2.0    # error-bar line width
+DATA_ELW   = 2.0  # error-bar line width
 DATA_CAPS  = 3.5
 
 matplotlib.rcParams.update({
@@ -48,7 +39,7 @@ matplotlib.rcParams.update({
     "font.serif"          : ["Times New Roman", "DejaVu Serif"],
     "font.weight"         : "bold",
     "mathtext.fontset"    : "dejavuserif",
-    "mathtext.default"    : "bfit",      # bold *italic* math (H1 style)
+    "mathtext.default"    : "bfit",  # bold *italic* math (H1 style)
     "axes.labelsize"      : FS_ROWLAB,
     "axes.labelweight"    : "bold",
     "axes.titlesize"      : FS_TITLE,
@@ -68,23 +59,20 @@ matplotlib.rcParams.update({
     "legend.edgecolor"    : "0.45",
     "legend.fontsize"     : FS_LEGEND,
     "figure.dpi"          : 150,
-    "axes.linewidth"      : 3.2,     # bold panel boundaries
+    "axes.linewidth"      : 3.2,  # bold panel boundaries
 })
 
-# CONSTANTS
 N_TOTAL = 500_000_000
 
-C_DEFAULT = "#1f77b4"    # blue   - Pythia default PDF
-C_CT18    = "#d62728"    # red    - Pythia CT18 NLO
-C_CT18_REMNANT = "#9467bd" # purple - Pythia CT18 NLO + Remnant
-C_CT18_PTUNE = "#ff7f0e" # orange - Pythia CT18NLO+pythia Tune
-C_CT18_GLUON = "#17becf" # cyan  - Pythia CT18NLO+gluon
+C_DEFAULT = "#1f77b4"  # blue
+C_CT18    = "#d62728"  # red
+C_CT18_REMNANT = "#9467bd"  # purple
+C_CT18_PTUNE = "#ff7f0e"  # orange
+C_CT18_GLUON = "#17becf"  # cyan
 C_DATA    = "black"
 
-# Extra stroke width applied to the x / y axis labels so they render heavier
-# WITHOUT changing their font size. Raise for even bolder, 0.0 to disable.
 AXIS_LABEL_STROKE = 1.1
-C_JAM     = "navy"       # JAM21 raw histogram (no normalisation) - shared
+C_JAM     = "navy"  # JAM21 raw histogram (no normalisation)
 
 # Ordered list of (key, display label, color) used throughout
 PDF_SETS = [
@@ -95,15 +83,10 @@ PDF_SETS = [
     ("ct18gluon",   "CT18 NLO + Gluon",          C_CT18_GLUON),
 ]
 
-# Ordered list of (key, LHAPDF-set-name, display label, color) for the
-# pion PDF used to build the JAM21-style pi-N flux x F2^pi curve.
-# Only JAM21 is used - all other pion PDFs have been removed.
 PION_PDF_SETS = [
     ("jam21", "JAM21PionPDFnlo_pT", "JAM21", "navy"),
 ]
 
-# The publication overview grid needs all THREE pion PDFs.
-# Kept separate so the JAM21-only grids above are unchanged.
 PION_PDF_SETS_OVERVIEW = [
     ("jam21",   "JAM21PionPDFnlo",   "JAM21",   "#1f77b4"),  # blue
     ("xfitter", "xFitterPI_NLO_VAR", "xFitter", "#ff7f0e"),  # orange
@@ -155,10 +138,9 @@ XL_EDGES = np.array([0.32, 0.41, 0.50, 0.59, 0.68, 0.77, 0.86, 0.95])
 XL_CTRS  = 0.5 * (XL_EDGES[:-1] + XL_EDGES[1:])
 XL_XERR  = 0.5 * (XL_EDGES[1:]  - XL_EDGES[:-1])
 XL_BWS   = XL_EDGES[1:] - XL_EDGES[:-1]
-N_XL     = len(XL_CTRS)   # 7
+N_XL     = len(XL_CTRS)
 
 
-# HELPERS
 def pick(av, candidates):
     for c in candidates:
         if c in av: return c
@@ -187,9 +169,6 @@ def dsig_to_f2ln(dsig_per_xl, x, Q2, dx, dQ2):
     return np.asarray(dsig_per_xl, dtype=float) / (P * kin * dx * dQ2)
 
 
-# from h1_five_settings.py: H1 data
-
-# H1 DATA
 def load_hdat_f2ln(path):
     raw  = np.loadtxt(path)
     Q2m  = raw[:, 0];  xBm = raw[:, 1];  xLc = raw[:, 2]
@@ -225,8 +204,6 @@ def load_hdat_f2ln(path):
 
     return {k: tuple(np.array(v) for v in vv) for k, vv in data.items()}
 
-
-# from h1_five_settings.py: NLO F2^pi-, s-exp flux (Lambda = 1.31)
 
 _CF = 4.0 / 3.0;  _TR = 0.5
 
@@ -309,14 +286,6 @@ def f_piN_model_i(xL):
     return pref * val
 
 
-# from h1_five_settings.py: pion F2^LN histograms (f2pi_nlo)
-
-# GENERIC PION-PDF LN FLUX x F2^pi  (works for any LHAPDF pion set)
-# compute_f2pi_minus_allflav_nlo() and f_piN_model_i() above already take a
-# generic `pdf` object / are PDF-independent, so the same physics is reused
-# here for MAP23Pion_PRVnlo, FANTO10_n15, xFitterPI_NLO_VAR, GRVPI1, etc.
-# Only the rebinned histogram (not the raw fine grid) is needed downstream
-# for plotting/fitting, so we skip the raw-grid step and rebin directly.
 def _pion_f2ln_pointwise(pdf_obj, xL, xbj, q2):
     x_pi = xbj / (1.0 - xL)
     if x_pi <= 0.0 or x_pi >= 1.0:
@@ -327,18 +296,15 @@ def _pion_f2ln_pointwise(pdf_obj, xL, xbj, q2):
 try:
     import f2pi_nlo
     _HAVE_GPU_PATH = True
-except Exception as _e:                                  # pragma: no cover
+except Exception as _e:
     print(f"  NOTE: f2pi_nlo unavailable ({_e}); using the slow CPU path.")
     _HAVE_GPU_PATH = False
 
-# Set to False to force the original scipy.quad implementation.
+# Set to False to force the original scipy.quad implementation
 USE_FAST_F2PI = True
 
 
 def rebin_pion_to_xl_edges(pdf_obj, n_sub=12, label="pion"):
-    """Batched (GPU/vectorised) rebin, falling back to the original
-    scipy.quad loop if f2pi_nlo can't be imported or USE_FAST_F2PI is off.
-    """
     if USE_FAST_F2PI and _HAVE_GPU_PATH:
         print(f"    [{label}] backend: {f2pi_nlo.backend_name()}", flush=True)
         return f2pi_nlo.rebin_pion_to_xl_edges_fast(
@@ -348,9 +314,7 @@ def rebin_pion_to_xl_edges(pdf_obj, n_sub=12, label="pion"):
 
 
 def rebin_pion_to_xl_edges_cpu(pdf_obj, n_sub=12):
-    """Original per-point scipy.quad implementation. Kept as the reference
-    the batched path is verified against.
-    """
+    """Original per-point scipy.quad implementation."""
     jam_hist = {}
     for ix, xbj in enumerate(X_MEANS):
         for iq, q2 in enumerate(Q2_MEANS):
@@ -365,9 +329,6 @@ def rebin_pion_to_xl_edges_cpu(pdf_obj, n_sub=12):
 
 
 def load_pion_pdf_hists(pion_pdf_sets=PION_PDF_SETS, skip_keys=()):
-    """Loads every pion PDF in `pion_pdf_sets` via LHAPDF (member 0) and builds
-    its rebinned F2LN histogram per (iq, ix) cell.
-    """
     hists = {}
     for key, pdfname, label, _ in pion_pdf_sets:
         if key in skip_keys:
@@ -383,13 +344,7 @@ def load_pion_pdf_hists(pion_pdf_sets=PION_PDF_SETS, skip_keys=()):
     return hists
 
 
-# from h1_five_settings.py: cell averages
-
-# COMBINED OVERVIEW  -  every (pion PDF x Pythia PDF) combination
 def average_over_cells(model_dict, h1_data):
-    """Simple unweighted average of a per-cell model dict over every cell
-    that also has H1 data, giving one representative x_L curve.
-    """
     total = np.zeros(N_XL); n = 0
     for cell, model in model_dict.items():
         if cell in h1_data:
@@ -398,9 +353,6 @@ def average_over_cells(model_dict, h1_data):
 
 
 def average_h1(h1_data):
-    """Inverse-variance-weighted average of all H1 points, rebinned onto
-    XL_EDGES, collapsing every (Q2, x_B) cell onto one representative curve.
-    """
     sum_wf = np.zeros(N_XL); sum_w = np.zeros(N_XL)
     for xL_h1, F2_h1, _stat, tot_h1 in h1_data.values():
         idx = np.clip(np.searchsorted(XL_EDGES[1:], xL_h1, side='left'), 0, N_XL - 1)
@@ -414,31 +366,20 @@ def average_h1(h1_data):
     return avg, err
 
 
-# from h1_five_settings.py: publication overview grid
-
-# ONE colour scheme, reused identically in every panel (deliberately NOT
-# coloured per Pythia set -- the columns are told apart by their headings,
-# not by hue). Line styles differ too, so it survives greyscale printing.
-C_DIS_OV   = "#1f77b4"   # DIS fragmentation  (Pythia proton PDF)
-C_PDFAV_OV = "#2ca02c"   # PDF average        (pion PDF)
-C_TOTAL_OV = "#d62728"   # Total = DIS + PDF
+C_DIS_OV   = "#1f77b4"  # DIS fragmentation  (Pythia proton PDF)
+C_PDFAV_OV = "#2ca02c"  # PDF average        (pion PDF)
+C_TOTAL_OV = "#d62728"
 
 LS_DIS_OV, LS_PDFAV_OV, LS_TOTAL_OV = "--", "-.", "-"
 
-# The 7x7 grids can afford FS_TITLE=28, but five long column headings
-# ("CT18 NLO + Remnant" ...) collide at that size, so this grid uses its own.
 FS_TITLE_OV = 22
 
-# The chi^2/N box is an annotation, not a heading -- at FS_LEGEND (24) it
-# dominates the panel and crowds the curves, so it gets its own size.
 FS_CHI2_OV = 15
 
-# H1 F_2^LN reaches ~0.12; 0.14 ceiling.
+# H1 F_2^LN reaches ~0.12; 0.14 ceiling
 OVERVIEW_YLIM   = (0.0, 0.14)
-OVERVIEW_XTICKS = [0.4, 0.6, 0.8]          # interior ticks only: with
-OVERVIEW_YTICKS = [0.03, 0.06, 0.09, 0.12]  # wspace=hspace=0 the panels
-                                            # touch, so an edge tick would
-                                            # collide with the neighbour.
+OVERVIEW_XTICKS = [0.4, 0.6, 0.8]
+OVERVIEW_YTICKS = [0.03, 0.06, 0.09, 0.12]
 
 
 def _ov_tick_fmt(v, pos):
@@ -449,11 +390,6 @@ def _ov_tick_fmt(v, pos):
 
 
 def _average_pair_over_cells(py_dict, pion_dict, h1_data):
-    """Cell-average the Pythia (DIS fragmentation) and pion (PDF average)
-    F_2^LN histograms over every (Q^2, x_B) cell that carries an H1
-    measurement, counting -- in each x_L bin independently -- only the
-    cells where BOTH curves are finite.
-    """
     s_dis = np.zeros(N_XL)
     s_pdf = np.zeros(N_XL)
     n_cnt = np.zeros(N_XL)
@@ -480,10 +416,6 @@ def _average_pair_over_cells(py_dict, pion_dict, h1_data):
 
 
 def _chi2_total_over_cells(py_dict, pion_dict, h1_data):
-    """Overall chi^2 and N of the H1 points against the per-cell Total
-    (Pythia + pion), accumulated over the whole grid, using the TOTAL
-    (stat (+) syst) error as the weight.
-    """
     chi2 = 0.0
     ndof = 0
     for cell, h1_cell in h1_data.items():
@@ -528,16 +460,12 @@ def make_publication_overview_grid(pythia_dict, pion_hists, h1_data, out,
     h1_avg, h1_err = average_h1(h1_data)
     hvalid = np.isfinite(h1_avg) & np.isfinite(h1_err)
 
-    # Panels touch edge-to-edge (H1 staircase convention). Panel size matches
-    # the 7x7 grids, so the shared FS_* sizes stay consistent between figures.
     fig, axes = plt.subplots(
         n_pion, n_py,
         figsize=(n_py * 4.8, n_pion * 4.0),
         gridspec_kw=dict(wspace=0.0, hspace=0.0),
         sharex=True, sharey=True, squeeze=False)
     fig.patch.set_facecolor("white")
-    # Default subplot margins leave ~12% blank above the titles, which would
-    # open a dead gap under the shared legend.
     fig.subplots_adjust(left=0.085, right=0.985, top=0.935, bottom=0.075,
                         wspace=0.0, hspace=0.0)
 
@@ -578,7 +506,6 @@ def make_publication_overview_grid(pythia_dict, pion_hists, h1_data, out,
             if legend_src is None and pion_dict is not None:
                 legend_src = ax
 
-            # the ONLY per-panel annotation: chi^2/N
             if ndof > 0:
                 ax.text(0.965, 0.955, rf"$\chi^2/N = {chi2 / ndof:.2f}$",
                         transform=ax.transAxes, ha="right", va="top",
@@ -617,7 +544,6 @@ def make_publication_overview_grid(pythia_dict, pion_hists, h1_data, out,
                             ha="center", va="center", rotation=90,
                             fontsize=FS_ROWLAB, fontweight="bold"))
 
-    # ---- ONE shared legend, above the grid (never repeated per panel) --
     if legend_src is not None:
         handles, labels = legend_src.get_legend_handles_labels()
         seen, h2, l2 = set(), [], []
@@ -653,8 +579,6 @@ def make_publication_overview_grid(pythia_dict, pion_hists, h1_data, out,
         uy0 = min(p.y0 for p in pos) - 0.03
 
     pad = 0.012
-    # Same font size, stroked so the glyphs render heavier (mathtext has no
-    # weight above bold) -- identical trick to the 7x7 grids.
     _lbl_stroke = [patheffects.withStroke(linewidth=AXIS_LABEL_STROKE,
                                           foreground="black")]
 
@@ -662,8 +586,6 @@ def make_publication_overview_grid(pythia_dict, pion_hists, h1_data, out,
                    fontsize=FS_AXLABEL, fontweight="bold")
     t_x.set_path_effects(_lbl_stroke)
 
-    # The row headings (JAM21 / xFitter / GRV) live in the left margin, so
-    # anchor the universal y label outside THEM, not merely outside the axes.
     y_anchor = ux0
     if renderer is not None:
         try:
@@ -687,11 +609,10 @@ def make_publication_overview_grid(pythia_dict, pion_hists, h1_data, out,
     plt.close(fig)
 
 
-# Revised analysis: Pythia from the count histograms, new pion inputs
 import csv as _csv
 
 HERE_ = os.path.dirname(os.path.abspath(__file__))
-import lambda_fit as _ZLF                      # noqa: E402
+import lambda_fit as _ZLF
 
 HIST_DIR = os.path.join(HERE_, "..", "inputs", "pythia_histograms")
 H1_DAT_PATH = os.path.join(HERE_, "..", "data", "h1.dat")
@@ -699,7 +620,6 @@ FIT_CSV = os.path.join(HERE_, "..", "lambda_fit", "lambda_fit_results.csv")
 H1_HISTS = [("default", "Pythia default"), ("ct18", "CT18 NLO"), ("ct18remnant", "CT18 NLO + Remnant"),
             ("ct18ptune", "CT18 NLO + Tuning"), ("ct18gluon", "CT18 NLO + Gluon")]
 JAM21_TABLE1_LAMBDA = 1.31
-# chi^2/N printed in the overview figure of the submitted version
 ORIGINAL_CHI2N = {"jam21": [5.81, 5.99, 5.95, 17.25, 5.35],
                   "xfitter": [1.96, 2.01, 5.05, 6.96, 1.92],
                   "grv": [8.04, 8.28, 7.21, 19.49, 7.52]}
@@ -725,7 +645,6 @@ def pythia_f2ln_from_hist(npz_path):
 
 
 def make_flux(lam):
-    """h1_five_settings.py's f_piN_model_i with the cutoff Lambda as a parameter (identical integrand, K2_MAX = 0.04)."""
     @lru_cache(maxsize=512)
     def f(xL):
         if xL <= 0.0 or xL >= 1.0: return 0.0
@@ -744,7 +663,6 @@ def make_flux(lam):
 
 
 class MeanPionPdfGrid(f2pi_nlo.PionPdfGrid):
-    """f2pi_nlo.PionPdfGrid holding the replica-MEAN x f(x) (same X_FINE, same log-x interpolation)."""
     def __init__(self, arrays, q2val):
         self.q2 = float(q2val)
         self.log_x = f2pi_nlo.to_gpu(f2pi_nlo._LOG_X_FINE)
@@ -785,7 +703,7 @@ def pion_hists_new():
     lam = best_lambdas()
     hists = {}
     jam = "JAM21PionPDFnlo"
-    pdf0 = lhapdf.mkPDF(jam, 0)                                   # alpha_s only (same for every replica)
+    pdf0 = lhapdf.mkPDF(jam, 0)  # alpha_s only (same for every replica)
     print(f"\nJAM21 = mean of the {jam} replicas, Lambda = {JAM21_TABLE1_LAMBDA}")
     hists["jam21"] = rebin_fast_grid(
         pdf0, lambda q2: MeanPionPdfGrid(_ZLF._mean_arrays(jam, q2, f2pi_nlo.X_FINE, True), q2),

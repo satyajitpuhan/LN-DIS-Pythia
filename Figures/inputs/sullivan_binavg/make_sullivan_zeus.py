@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """ZEUS Sullivan term averaged over each (x_B, Q^2) bin (12 x 12 points equally spaced in
 ln x_B and ln Q^2, y <= 1); x_L stays at the bin centre.
-
-Usage: python3 make_sullivan_zeus.py --prep, then --pdf {jam21,xfitter,grv} --mode new
 """
 import argparse
 import os
@@ -14,9 +11,9 @@ sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "common"))
 
-import numpy as np          # noqa: E402
-import lhapdf               # noqa: E402
-import zeus_sullivan as OZ  # noqa: E402
+import numpy as np
+import lhapdf
+import zeus_sullivan as OZ
 
 OZ.lhapdf = lhapdf
 SETS = {"jam21": ("JAM21PionPDFnlo", "JAM21"), "xfitter": ("xFitterPI_NLO_VAR", "xFitter"),
@@ -42,9 +39,6 @@ def mean_file(n):
 
 
 def _prep_worker(args):
-    """Same function as everywhere else (lambda_fit._mean_arrays: replicas 1..785,
-    xfxQ on the X_FINE grid of zeus_three_pions.py), but with a private per-worker cache file.
-    """
     k, q2_list = args
     OZ._ZLF.MEAN_CACHE = os.path.join(HERE, "..", "..", "cache", f"_mean_part{k}.npz")
     OZ._ZLF._MEAN = {}
@@ -70,11 +64,10 @@ def prep(n, workers=6):
 
 
 class MeanPDFAt(OZ.MeanPDF):
-    """OZ.MeanPDF (replica-mean x f(x) in the PDF_CACHE of zeus_three_pions.py) for an arbitrary list of Q^2."""
     def __init__(self, set_name, q2_list, n):
         self.set_name = set_name
         self._m0 = lhapdf.mkPDF(set_name, 0)
-        OZ._ZLF.MEAN_CACHE = mean_file(n)          # read-only here (all keys present after --prep)
+        OZ._ZLF.MEAN_CACHE = mean_file(n)
         OZ._ZLF._MEAN = None
         for q2 in q2_list:
             OZ.PDF_CACHE[(id(self), float(q2))] = OZ._ZLF._mean_arrays(set_name, float(q2), OZ.X_FINE, False)

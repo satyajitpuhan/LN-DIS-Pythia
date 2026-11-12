@@ -25,7 +25,7 @@ def to_cpu(a):
     return xp.asnumpy(a) if GPU else np.asarray(a)
 
 
-# Constants -- must match the scalar code in h1_five_settings.py
+# Constants
 _CF = 4.0 / 3.0
 _TR = 0.5
 
@@ -49,25 +49,18 @@ _Cq2_DELTA = _CF * (np.pi ** 2 / 3.0 - 9.0 / 2.0)
 
 PIDS_NEEDED = [1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 21]
 
-# Tabulation grid. Log-spaced, and interpolation is done in log x, which is
-# where PDFs are smooth.
 X_FINE = np.logspace(-7, np.log10(1.0 - 1e-8), 6000)
 _LOG_X_FINE = np.log(X_FINE)
 
-# Fixed-order Gauss-Legendre nodes. Generous, since raising it is nearly
-# free once the work is batched.
 N_QUAD = 256
 _GL_N, _GL_W = np.polynomial.legendre.leggauss(N_QUAD)
 GL_NODES = to_gpu(_GL_N)
 GL_WEIGHTS = to_gpu(_GL_W)
 
-_ZMAX = 1.0 - 1e-6      # upper limit of the z integral
+_ZMAX = 1.0 - 1e-6  # upper limit of the z integral
 
 
 class PionPdfGrid:
-    """Tabulates one PDF member at one Q^2 (CPU, via LHAPDF) and interpolates
-    xf(pid, x) for arbitrary batched x arrays on the device.
-    """
 
     def __init__(self, pdf, q2val):
         self.q2 = float(q2val)
@@ -84,7 +77,7 @@ class PionPdfGrid:
         self.grids = {pid: to_gpu(g) for pid, g in grids.items()}
 
     def xfq(self, pid, xval):
-        """xf(pid, x), 0 outside (0, 1). xval may be any shape."""
+        """xf(pid, x), 0 outside (0, 1)."""
         shape = xval.shape
         flat = xval.reshape(-1)
         valid = (flat > 0.0) & (flat < 1.0)
@@ -113,10 +106,7 @@ def _Cg2_kernel(z):
 
 
 def _gl_nodes_on(a, b):
-    """Gauss-Legendre nodes/jacobian for a batch of intervals [a_i, b_i].
-    a, b are 1-D device arrays of length n. Returns (z, w, jac) with z of
-    shape (n, N_QUAD).
-    """
+    """Gauss-Legendre nodes/jacobian for a batch of intervals [a_i, b_i]."""
     half = 0.5 * (b - a)
     mid = 0.5 * (b + a)
     z = mid[:, None] + half[:, None] * GL_NODES[None, :]
@@ -124,9 +114,7 @@ def _gl_nodes_on(a, b):
 
 
 def f2pi_minus_nlo_vec(pdf, grid, x_arr_cpu, q2val):
-    """NLO F2^{pi-} for every x in x_arr_cpu (1-D numpy) at one Q^2, using the
-    tabulated `grid`. Returns a numpy array of the same length.
-    """
+    """NLO F2^{pi-} for every x in x_arr_cpu (1-D numpy) at one Q^2, using the tabulated `grid`."""
     x_cpu = np.asarray(x_arr_cpu, dtype=np.float64)
     x = to_gpu(x_cpu)
     n = x.shape[0]
@@ -140,8 +128,8 @@ def f2pi_minus_nlo_vec(pdf, grid, x_arr_cpu, q2val):
     zmax = xp.full(n, _ZMAX, dtype=xp.float64)
     z, w, jac = _gl_nodes_on(x_safe, zmax)
     one_minus_z = 1.0 - z
-    Cs = _Cq2_singular(z)                       # (n, N)
-    xo = x_safe[:, None] / z                    # PDF argument x/z
+    Cs = _Cq2_singular(z)  # (n, N)
+    xo = x_safe[:, None] / z  # PDF argument x/z
     valid_xo = xo < 1.0
 
     # boundary term  bdy(x) = int_0^x C(z)/(1-z) dz
@@ -192,9 +180,9 @@ def rebin_pion_to_xl_edges_fast(pdf_obj, x_means, q2_means, xl_edges,
     for i in range(n_xl):
         lo, hi = xl_edges[i], xl_edges[i + 1]
         sub_pts.append(lo + (np.arange(n_sub) + 0.5) * (hi - lo) / n_sub)
-    sub_pts = np.concatenate(sub_pts)             # (n_xl * n_sub,)
+    sub_pts = np.concatenate(sub_pts)  # (n_xl * n_sub,)
 
-    # LN flux factor -- depends only on x_L, so compute it once.
+    # LN flux factor
     flux_sub = np.array([2.0 * float(flux_fn(float(xl))) for xl in sub_pts])
     flux_grid = flux_sub.reshape(n_xl, n_sub)
 
@@ -206,12 +194,11 @@ def rebin_pion_to_xl_edges_fast(pdf_obj, x_means, q2_means, xl_edges,
         x_pi_all = []
         for xbj in x_means:
             x_pi_all.append(xbj / (1.0 - sub_pts))
-        x_pi_all = np.concatenate(x_pi_all)       # (n_x * n_xl * n_sub,)
+        x_pi_all = np.concatenate(x_pi_all)  # (n_x * n_xl * n_sub,)
 
         vals = f2pi_minus_nlo_vec(pdf_obj, grid, x_pi_all, float(q2))
         vals = vals.reshape(len(x_means), n_xl, n_sub)
 
-        # apply the LN flux, then average over the sub-points in each x_L bin
         vals = vals * flux_grid[None, :, :]
 
         for ix in range(len(x_means)):

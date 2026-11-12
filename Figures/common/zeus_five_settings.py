@@ -13,20 +13,20 @@ from scipy.integrate import quad, IntegrationWarning
 
 warnings.filterwarnings("ignore", category=IntegrationWarning)
 
-# FONT SIZES / WEIGHTS -- house style.
-FS_AXLABEL = 42     # F_2^LN(...) and x_L axis labels
-FS_TITLE   = 28     # Q^2 column titles
-FS_ROWLAB  = 26     # x_BJ row labels
-FS_TICK    = 24     # x and y tick numbers
-FS_LEGEND  = 24     # the one shared corner legend
+# FONT SIZES / WEIGHTS
+FS_AXLABEL = 42  # F_2^LN(...) and x_L axis labels
+FS_TITLE   = 28  # Q^2 column titles
+FS_ROWLAB  = 26  # x_BJ row labels
+FS_TICK    = 24  # x and y tick numbers
+FS_LEGEND  = 24  # the one shared corner legend
 
-SPINE_LW   = 3.2    # panel box -- deliberately heavy
-LW_PYTHIA  = 2.6    # raw Pythia (DIS background) histograms
-LW_JAM     = 3.2    # raw JAM21 pion histogram
-LW_SUM     = 3.2    # Pythia + JAM21 sums
-DATA_MS    = 7.0    # ZEUS marker size
+SPINE_LW   = 3.2  # panel box
+LW_PYTHIA  = 2.6  # raw Pythia (DIS background) histograms
+LW_JAM     = 3.2  # raw JAM21 pion histogram
+LW_SUM     = 3.2  # Pythia + JAM21 sums
+DATA_MS    = 7.0  # ZEUS marker size
 DATA_MEW   = 1.5
-DATA_ELW   = 2.0    # error-bar line width
+DATA_ELW   = 2.0  # error-bar line width
 DATA_CAPS  = 3.5
 
 matplotlib.rcParams.update({
@@ -34,7 +34,7 @@ matplotlib.rcParams.update({
     "font.serif"          : ["Times New Roman", "DejaVu Serif"],
     "font.weight"         : "bold",
     "mathtext.fontset"    : "dejavuserif",
-    "mathtext.default"    : "bfit",      # bold *italic* math (H1/ZEUS style)
+    "mathtext.default"    : "bfit",  # bold *italic* math (H1/ZEUS style)
     "axes.labelsize"      : FS_ROWLAB,
     "axes.labelweight"    : "bold",
     "axes.titlesize"      : FS_TITLE,
@@ -54,27 +54,19 @@ matplotlib.rcParams.update({
     "legend.edgecolor"    : "0.45",
     "legend.fontsize"     : FS_LEGEND,
     "figure.dpi"          : 150,
-    "axes.linewidth"      : 3.2,     # bold panel boundaries
+    "axes.linewidth"      : 3.2,  # bold panel boundaries
 })
 
-# CONSTANTS
-N_TOTAL = 500_000_000          # N_generated: 5x10^8 events, same for all runs
+N_TOTAL = 500_000_000
 
-# Tree entries read into memory at once (chunked/low-memory streaming), so
-# peak RAM stays bounded regardless of how many events are in the file.
 CHUNK_SIZE = 2_000_000
 
 C_DATA = "black"
 
-# Extra stroke width applied to the x / y axis labels so they render heavier
-# WITHOUT changing their font size. Raise for even bolder, 0.0 to disable.
 AXIS_LABEL_STROKE = 1.1
 
-C_JAM21 = "navy"       # JAM21 raw histogram (no normalisation) -- shared
+C_JAM21 = "navy"  # JAM21 raw histogram (no normalisation)
 
-# Ordered list of (key, display label, color) used throughout -- built
-# from PYTHIA_FILES, so the same
-# argparse-per-file / process_all_pythia() pipeline can be reused.
 PDF_SETS = [
     ("default",     "Pythia default",      "#1f77b4"),
     ("ct18ptune",   "CT18NLO + Tuning",    "#ff7f0e"),
@@ -83,7 +75,6 @@ PDF_SETS = [
     ("ct18gluon",   "CT18NLO + Gluon",     "#17becf"),
 ]
 
-# Default ROOT file paths (WSL/Linux-side), one per PDF_SETS entry.
 PDF_SET_DEFAULT_PATHS = {
     "default":     os.path.join(PYTHIA_OUT, "zeus_default.root"),
     "ct18ptune":   os.path.join(PYTHIA_OUT, "zeus_ct18nlo_tuning.root"),
@@ -92,9 +83,6 @@ PDF_SET_DEFAULT_PATHS = {
     "ct18gluon":   os.path.join(PYTHIA_OUT, "zeus_ct18nlo_gluon.root"),
 }
 
-# Ordered list of (key, LHAPDF-set-name, display label, color) for the pion
-# PDF used to build the JAM21-style pi-N flux x F2^pi curve. Only JAM21 is
-# used.
 JAM21_PDF_NAME = "JAM21PionPDFnlo"
 PION_PDF_SETS = [
     ("jam21", JAM21_PDF_NAME, "JAM21", C_JAM21),
@@ -103,32 +91,24 @@ PION_PDF_SETS = [
 ALPHA      = 1.0 / 137.036
 GEV2_TO_NB = 0.3893793656e6
 E_E        = 27.5
-E_P        = 820.0             # ZEUS 1995-97 running (sqrt(s)~300 GeV), NOT
-                                # the HERA-II 920 GeV used for H1/920.
-S          = 4.0 * E_E * E_P   # 90 200 GeV^2
+E_P        = 820.0
+S          = 4.0 * E_E * E_P  # 90 200 GeV^2
 
-# ZEUS cuts (as specified)
-EePrime_MIN  = 10.0                    # E_e' > 10 GeV
-THETA_N_MAX  = 0.8e-3                  # theta_n  < 0.8 mrad
-PT_COEFF     = 0.656                   # neutron p_T acceptance: p_T < 0.656 * x_L [GeV]
-# NOTE: explicitly NO y cut, NO W^2 cut, NO electron-angle cut.
+# ZEUS cuts
+EePrime_MIN  = 10.0  # E_e' > 10 GeV
+THETA_N_MAX  = 0.8e-3  # theta_n  < 0.8 mrad
+PT_COEFF     = 0.656
 
 F2P_TABLE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "F2p_CT18NLO_values.txt")
 
-# x_L binning (ZEUS, 12 bins, matches zeus.dat centres)
 XL_EDGES = np.array([0.20, 0.28, 0.34, 0.40, 0.46, 0.52, 0.58,
                       0.64, 0.70, 0.76, 0.82, 0.88, 1.00])
 XL_CTRS  = 0.5 * (XL_EDGES[:-1] + XL_EDGES[1:])
 XL_XERR  = 0.5 * (XL_EDGES[1:]  - XL_EDGES[:-1])
 XL_BWS   = XL_EDGES[1:] - XL_EDGES[:-1]
-N_XL     = len(XL_CTRS)        # 12
+N_XL     = len(XL_CTRS)
 
 # ZEUS Q^2 bins (7 columns)
-# (Q2_nominal, Q2_lo, Q2_hi)
-# The former 8th column, Q^2 in [640, 1280] (nominal 960, tabulated in
-# zeus.dat under Q2=1000), has been dropped on request -- the grid is now
-# 7 x 7, matching zeus_three_pions.py. Per-panel ("subplot") size is unchanged: every
-# figure width scales with NQ_ZEUS, so each panel keeps its dimensions.
 Q2_BINS_ZEUS = [
     (7.0,    4.0,    10.0),
     (15.0,   10.0,   20.0),
@@ -139,12 +119,8 @@ Q2_BINS_ZEUS = [
     (480.0,  320.0,  640.0),
 ]
 
-# No Q^2 column needs a non-nominal zeus.dat key any more (the [640,1280]
-# column that was tabulated under Q2=1000 has been removed).
 Q2_ZEUS_DAT_KEY = {}
 
-# ---- ZEUS x_BJ bins (7 rows, SAME range used for every Q^2 column) --
-# (x_nominal, x_lo, x_hi)
 X_BINS_ZEUS = [
     (1.1e-4, 8.0e-5, 1.5e-4),
     (2.1e-4, 1.5e-4, 3.0e-4),
@@ -155,11 +131,10 @@ X_BINS_ZEUS = [
     (32.e-3, 1.0e-2, 1.0e-1),
 ]
 
-NQ_ZEUS = len(Q2_BINS_ZEUS)     # 7
-NX_ZEUS = len(X_BINS_ZEUS)      # 7   -> full 7x7 = 49-panel grid (diagonal populated)
+NQ_ZEUS = len(Q2_BINS_ZEUS)
+NX_ZEUS = len(X_BINS_ZEUS)
 
 
-# HELPERS
 def pick(av, candidates):
     for c in candidates:
         if c in av: return c
@@ -189,7 +164,7 @@ def dsig_to_f2ln(dsig_per_xl, x, Q2, dx, dQ2):
     return np.asarray(dsig_per_xl, dtype=float) / (P * kin * dx * dQ2)
 
 
-# JAM21 pion PDF (NLO F2^pi) + leading-neutron flux.
+# JAM21 pion PDF (NLO F2^pi) + leading-neutron flux
 LOCAL_LHAPDF_ROOT = "/home/aries/local"
 LOCAL_LHAPDF_SITE = f"{LOCAL_LHAPDF_ROOT}/lib/python3.10/dist-packages"
 LOCAL_LHAPDF_LIB  = f"{LOCAL_LHAPDF_ROOT}/lib/libLHAPDF.so"
@@ -344,14 +319,7 @@ def flux(x_l_val):
 
 
 def compute_all_jam21_f2ln_zeus(pdf):
-    """Full 7(x) x 8(Q2) rectangular grid. F_2LN(x_L) from the JAM21 pion PDF
-    convolved with the leading-neutron flux:
-        F_2LN(x_L) = 2 * f_{pi/N}(x_L) * F_2^pi(x_pi,Q2)
-    with x_pi = x_BJ / (1 - x_L), evaluated at the centre of each x_L bin
-    and drawn as a flat (stairs) curve across that bin -- this IS the
-    "rebinned JAM21 histogram" (jam_hist) shared by every PDF set.
-    Returns dict (iq, ix) -> f2ln array[N_XL] (NaN where x_pi >= 1).
-    """
+    """Full 7(x) x 8(Q2) rectangular grid."""
     f2ln_jam = {}
     for iq, (q2_nom, q2lo, q2hi) in enumerate(Q2_BINS_ZEUS):
         for ix, (x_nom, xlo, xhi) in enumerate(X_BINS_ZEUS):
@@ -370,7 +338,7 @@ def compute_all_jam21_f2ln_zeus(pdf):
 
 def load_f2p_table(filename=F2P_TABLE_FILE):
     table = np.loadtxt(filename)
-    return table[:, 0], table[:, 1], table[:, 2]   # x, Q2, F2p(CT18NLO)
+    return table[:, 0], table[:, 1], table[:, 2]  # x, Q2, F2p(CT18NLO)
 
 
 def match_f2p(x_query, q2_query, x_table, q2_table, f2p_table):
@@ -393,14 +361,7 @@ def match_f2p(x_query, q2_query, x_table, q2_table, f2p_table):
     return out
 
 
-# PYTHIA LOADER (chunked / low-memory streaming -- one call per PDF set)
 def load_pythia(path):
-    """Streams the tree in CHUNK_SIZE-entry batches instead of pulling every
-    branch fully into memory. Counts are histogrammed directly into the
-    (Q2, x_BJ, x_L) ZEUS grid as each chunk is read, so only the small
-    (8x7x12) count array and the current chunk's branches are ever
-    resident at once.
-    """
     import uproot
 
     with uproot.open(path, object_cache=None, array_cache=None) as f:
@@ -491,13 +452,8 @@ def load_pythia(path):
 
 
 def compute_all_pythia_f2ln_zeus(data):
-    """For every cell of the FULL 7(x) x 8(Q2) rectangular grid, compute
-    F_2LN from Pythia dsigma/dx_L -- regardless of whether ZEUS actually
-    published a data point there.
-    Returns dict (iq, ix) -> f2ln array[N_XL], dict (iq, ix) -> n_events
-    """
     sigma_dis = data["sigma_dis"]
-    counts    = data["counts"]        # shape (NQ_ZEUS, NX_ZEUS, N_XL)
+    counts    = data["counts"]
 
     f2ln_py = {}
     nevts   = {}
@@ -519,9 +475,6 @@ def compute_all_pythia_f2ln_zeus(data):
 
 
 def process_pythia(path, label):
-    """One PDF set: load + convert to F_2LN -- wrapper
-    around load_pythia() / compute_all_pythia_f2ln_zeus().
-    """
     print(f"  Loading Pythia ROOT file ({label}) from {path} ...")
     py_data = load_pythia(path)
     sigma_dis = py_data["sigma_dis"]
@@ -546,12 +499,7 @@ def process_all_pythia(paths):
     return results
 
 
-# ZEUS DATA (zeus.dat) -- same recipe as histojam.py
 def load_zeus_f2ln(path, f2p_table_file=F2P_TABLE_FILE):
-    """zeus.dat columns:
-    0: xL bin index   1: xL centre   2: Q2   3: x_BJ
-    4: R_LN (%)       5: dR_LN (%)   6: F2p_ref (model A)  7: F2p_ref (model B)
-    """
     raw = np.loadtxt(path)
     x_l  = raw[:, 1]
     q2   = raw[:, 2]
@@ -574,9 +522,6 @@ def load_zeus_f2ln(path, f2p_table_file=F2P_TABLE_FILE):
         for ix, (x_nom, _, _) in enumerate(X_BINS_ZEUS):
             lut[(round(q2_key, 6), round(x_nom, 8))] = (iq, ix)
 
-    # The Q^2 in [640, 1280] column (tabulated in zeus.dat under Q2=1000)
-    # has been dropped from the grid -- skip its rows quietly rather than
-    # emitting an "unmatched point" warning for every one of them.
     _DROPPED_Q2_DAT_KEYS = {1000.0}
 
     data = {}
@@ -605,13 +550,8 @@ def load_zeus_f2ln(path, f2p_table_file=F2P_TABLE_FILE):
     return out
 
 
-# SUM MODEL:  model_k = Pythia_k + JAM21_hist   (raw sum -- NO
-# normalisation, no fitting, no scaling factor of any kind is applied
-# anywhere).
 def compute_sum_model(f2ln_py, jam_hist):
-    """Returns sum_model[(iq,ix)] = py + jam_hist, for cells with both.
-    This is a plain element-wise sum -- no scaling factor of any kind.
-    """
+    """Returns sum_model[(iq,ix)] = py + jam_hist, for cells with both."""
     sum_model = {}
     for cell, py in f2ln_py.items():
         jh = jam_hist.get(cell)
@@ -621,7 +561,6 @@ def compute_sum_model(f2ln_py, jam_hist):
     return sum_model
 
 
-# chi^2/n  for sum model vs ZEUS data  (per-cell, for annotation only)
 def compute_chi2(sum_model, zeus_data):
     """Returns chi2[(iq,ix)] = chi2/n."""
     chi2_table = {}
@@ -640,10 +579,6 @@ def compute_chi2(sum_model, zeus_data):
 
 
 def finalize_pdf_set(results, jam_hist, zeus_data):
-    """For every PDF set in `results`, builds the plain sum
-    Pythia_k + JAM21_hist (no scaling factor at all), computes chi^2/n for
-    reference, and stores them back onto the same dict in-place.
-    """
     for key, label, _ in PDF_SETS:
         if key not in results:
             continue
@@ -658,15 +593,7 @@ def finalize_pdf_set(results, jam_hist, zeus_data):
         r["chi2"] = chi2_table
 
 
-# OVERALL CHI^2  (summed across every ZEUS data point, not the per-cell
-# average -- total chi^2 and point count N for each PDF set's
-# Pythia_k + JAM21 sum curve vs ZEUS)
 def compute_overall_chi2(results, zeus_data):
-    """For every PDF set in `results`, compute the overall chi^2 (summed
-    over ALL ZEUS data points across ALL cells) of ZEUS data vs. the
-    summed curve  Pythia_k + JAM21  -- i.e. r["sum_model"], the exact
-    curve drawn as the dashed "+JAM21" line in _draw_cell().
-    """
     out = {}
     for key, label, _ in PDF_SETS:
         if key not in results:
@@ -701,9 +628,7 @@ def compute_overall_chi2(results, zeus_data):
 
 
 def save_chi2_table(results, out_path, title=""):
-    """Write an overall chi^2 summary (one row per PDF-set curve) to a
-    plain-text file.
-    """
+    """Write an overall chi^2 summary (one row per PDF-set curve) to a plain-text file."""
     with open(out_path, "w") as f:
         if title:
             f.write(f"{title}\n")
@@ -717,7 +642,6 @@ def save_chi2_table(results, out_path, title=""):
     print(f"  -> {out_path}")
 
 
-# CELL DRAWING  (small-panel form, one legend per panel)
 def _draw_cell(ax, results, cell, zeus_cell, jam_hist_cell,
                compact=True, sum_only=False):
     """Draw one (Q^2, x_BJ) cell onto ax."""
@@ -733,13 +657,12 @@ def _draw_cell(ax, results, cell, zeus_cell, jam_hist_cell,
         sum_cell  = r.get("sum_model", {}).get(cell)
         chi2_cell = r.get("chi2", {}).get(cell)
 
-        # -- raw Pythia step-histogram --------------------------------
+        # raw Pythia step-histogram
         if not sum_only and py is not None:
             lbl = (rf"{label} $N={n:,}$" if compact
                    else rf"{label}  $N={n:,}$,  $\sigma={sig:.3f}\ \mathrm{{nb}}$")
             ax.stairs(py, XL_EDGES, color=color, lw=1.3, label=lbl)
 
-        # -- sum curve  Pythia_k + JAM21_hist  (plain sum, no normalisation) --
         if sum_cell is not None:
             c2n = chi2_cell if chi2_cell is not None else float('nan')
             lbl = (rf"{label}+JAM21 $\chi^2/n={c2n:.2f}$" if compact
@@ -747,12 +670,12 @@ def _draw_cell(ax, results, cell, zeus_cell, jam_hist_cell,
             ax.stairs(sum_cell, XL_EDGES, color=color, lw=2.0, ls='--',
                       label=lbl, alpha=0.9)
 
-    # -- JAM21 histogram (raw, no normalisation) -- shared, drawn once --
+    # JAM21 histogram (raw, no normalisation)
     if not sum_only and jam_hist_cell is not None:
         ax.stairs(jam_hist_cell, XL_EDGES, color=C_JAM21, lw=1.3, ls='-',
                   label="JAM21 (raw)")
 
-    # -- ZEUS data -----------------------------------------------------
+    # ZEUS data
     if zeus_cell is not None:
         xl_d, f2_d, e_d = zeus_cell
         ax.errorbar(xl_d, f2_d, yerr=e_d,
@@ -769,9 +692,6 @@ def _draw_cell(ax, results, cell, zeus_cell, jam_hist_cell,
               borderpad=0.3, framealpha=0.85, labelspacing=0.2)
 
 
-# PLOT -- SMALL-PANEL GRID (shared skeleton for the full grid and the
-# sum-only grid). ZEUS's (Q^2,x_BJ) grid is diagonal/sparse, so empty
-# panels are hidden and titles/labels latch onto the visible edges.
 def _make_grid_generic(results, zeus_data, jam_hist, out, suffix, title, sum_only):
     fig, axes = plt.subplots(NX_ZEUS, NQ_ZEUS,
                              figsize=(NQ_ZEUS * 3.2, NX_ZEUS * 2.8),
@@ -834,9 +754,7 @@ def _make_grid_generic(results, zeus_data, jam_hist, out, suffix, title, sum_onl
 
 
 def make_grid(results, zeus_data, jam_hist, out):
-    """Main small-panel grid: raw Pythia (x5 sets) + JAM21 (raw) + sum
-    (x5 sets) + ZEUS data.
-    """
+    """Main small-panel grid: raw Pythia (x5 sets) + JAM21 (raw) + sum (x5 sets) + ZEUS data."""
     title = (rf"$F_{{2LN}}(x_L)$ -- Pythia (baseline/CT18NLO Tuning/CT18NLO/"
               rf"CT18NLO+Remnant/CT18NLO+gluon) + JAM21 (hist) vs ZEUS data")
     _make_grid_generic(results, zeus_data, jam_hist, out,
@@ -844,9 +762,6 @@ def make_grid(results, zeus_data, jam_hist, out):
 
 
 def make_grid_sum_only(results, zeus_data, jam_hist, out):
-    """Extra small-panel grid with ONLY the raw sum curves
-    Pythia_k+JAM21 (no normalisation) vs ZEUS data.
-    """
     title = (rf"$F_{{2LN}}(x_L)$ -- raw sum $\mathrm{{Py}}_k+\mathrm{{JAM21}}$ "
               rf"(no normalisation) (baseline/CT18NLO Tuning/CT18NLO/"
               rf"CT18NLO+Remnant/CT18NLO+gluon) vs ZEUS data")
@@ -854,22 +769,12 @@ def make_grid_sum_only(results, zeus_data, jam_hist, out):
                        suffix="_sumonly", title=title, sum_only=True)
 
 
-# PLOT -- DIS BACKGROUND (Pythia only) and DIS BACKGROUND + JAM21 GRIDS
-#   * no sum curves except in the "+JAM21" variant, no chi^2 anywhere
-#   * legend shown ONLY once, in the largest empty corner
-#   * no overall figure title / suptitle
-#   * bold axis labels + bold tick labels, white backgrounds
 def _pythia_label(label):
-    """'CT18NLO' -> 'Pythia (CT18NLO)', but leave names that already say
-    Pythia alone.
-    """
+    """'CT18NLO' -> 'Pythia (CT18NLO)', but leave names that already say Pythia alone."""
     return label if label.strip().lower().startswith("pythia") else f"Pythia ({label})"
 
 
 def _xl_tick_fmt(v, pos):
-    """Bold x_L tick labels: 0.25, 0.50, 0.75, 1 -- whole numbers lose the
-    trailing '.00' (H1/ZEUS style).
-    """
     if abs(v - round(v)) < 1e-9:
         return rf"$\mathbf{{{int(round(v))}}}$"
     return rf"$\mathbf{{{v:.2f}}}$"
@@ -885,9 +790,7 @@ def _xb_label_bold(lo, hi):
 
 def _draw_cell_bg(ax, results, cell, zeus_cell, jam_hist_cell,
                    include_pythia, include_jam, include_sum, compact=True):
-    """Draw one (Q^2, x_B) cell. Which curves appear is controlled by three
-    independent switches:
-    """
+    """Draw one (Q^2, x_B) cell."""
     if include_pythia:
         for key, label, color in PDF_SETS:
             if key not in results:
@@ -912,8 +815,6 @@ def _draw_cell_bg(ax, results, cell, zeus_cell, jam_hist_cell,
 
     if zeus_cell is not None:
         xl_d, f2_d, e_d = zeus_cell
-        # EXACTLY the H1/ZEUS data-point style: filled black circles with a
-        # single VERTICAL error bar -- no horizontal x error bars.
         ax.errorbar(xl_d, f2_d, yerr=e_d,
                     fmt="o", ms=DATA_MS, mfc="black", mec="black",
                     mew=DATA_MEW, ecolor="black", elinewidth=DATA_ELW,
@@ -941,8 +842,6 @@ def _draw_cell_bg(ax, results, cell, zeus_cell, jam_hist_cell,
     plt.setp(ax.get_yticklabels(), fontweight="bold")
 
 
-# FIGURE-LEVEL LEGEND placed in the largest empty corner of the grid
-# (parameterised by nrow/ncol so it works for the ZEUS 7x7 grid).
 def _largest_empty_block_at(cell_has_data, nrow, ncol, corner="top-left"):
     def _all_empty(cells):
         return all(not cell_has_data.get(c, False) for c in cells)
@@ -983,25 +882,18 @@ def _block_centre(axes, block):
 
 def _place_f2_label_top_left(fig, axes, cell_has_data, nrow, ncol, text,
                              fontsize, stroke=None, dx=0.0):
-    """Put the F_2^LN axis label INSIDE the empty top-left staircase
-    corner, horizontal -- the way the published H1/ZEUS figure does it.
-    Also places "ZEUS" label above it.
-    `dx` (figure fraction) shifts the label horizontally, e.g. negative
-    to move it further left and clear of the staircase edge.
-    Returns True if placed, False if there is no empty top-left block.
-    """
     block = _largest_empty_block_at(cell_has_data, nrow, ncol, "top-left")
     if not block:
         return False
     cx, cy = _block_centre(axes, block)
     cx += dx
-    
+
     # Place "ZEUS" label above F_2LN label
     t_zeus = fig.text(cx, cy + 0.03, "ZEUS", ha="center", va="center",
                       fontsize=fontsize, fontweight="bold")
     if stroke:
         t_zeus.set_path_effects(stroke)
-    
+
     # Place F_2LN label below ZEUS
     t = fig.text(cx, cy, text, ha="center", va="center",
                  fontsize=fontsize, fontweight="bold")
@@ -1011,10 +903,6 @@ def _place_f2_label_top_left(fig, axes, cell_has_data, nrow, ncol, text,
 
 
 def _place_legend_in_empty_space(fig, axes, cell_has_data, source_ax, nrow, ncol):
-    """Grab the curve handles from a populated panel and draw one big,
-    bold legend centred in the largest empty corner block, shrinking the
-    font until it fits inside that block.
-    """
     handles, labels = source_ax.get_legend_handles_labels()
     if not handles:
         return
@@ -1061,7 +949,7 @@ def _make_grid_bg_generic(results, zeus_data, jam_hist, out, suffix,
                              gridspec_kw=dict(wspace=0.0, hspace=0.0),
                              sharex=False, sharey=False)
     fig.patch.set_facecolor("white")
-    # No fig.suptitle(...) -- no overall header, per spec.
+    # No fig.suptitle(...)
 
     cell_has_data = {}
     for ix in range(NX_ZEUS):
@@ -1175,9 +1063,6 @@ def _make_grid_bg_generic(results, zeus_data, jam_hist, out, suffix,
 
 
 def make_grid_bg_only(results, zeus_data, jam_hist, out):
-    """DIS background grid: ONLY the raw Pythia curves (all five PDF
-    sets) vs ZEUS data. No JAM21, no sum curves, no chi^2, no header.
-    """
     _make_grid_bg_generic(results, zeus_data, jam_hist, out,
                           suffix="_dis_background_only",
                           include_pythia=True, include_jam=False,
@@ -1185,17 +1070,12 @@ def make_grid_bg_only(results, zeus_data, jam_hist, out):
 
 
 def make_grid_bg_jam(results, zeus_data, jam_hist, out):
-    """DIS background grid: ONLY the summed model  Pythia_k + JAM21  (the
-    "added" curves, one per PDF set, no normalisation) vs ZEUS data. No
-    separate raw Pythia or raw JAM21 curves, no chi^2, no header.
-    """
     _make_grid_bg_generic(results, zeus_data, jam_hist, out,
                           suffix="_dis_background_jam21",
                           include_pythia=False, include_jam=False,
                           include_sum=True)
 
 
-# PLOT -- INDIVIDUAL CELL PLOTS (one per ZEUS-data-bearing cell)
 def make_individual(results, zeus_data, jam_hist, out):
     ind_dir = f"{out}_f2ln_individual"
     os.makedirs(ind_dir, exist_ok=True)
@@ -1229,11 +1109,7 @@ def make_individual(results, zeus_data, jam_hist, out):
     print(f"  -> {ind_dir}/  ({n_saved} plots)")
 
 
-# COMBINED OVERVIEW -- every (pion PDF x Pythia PDF) combination
 def average_over_cells(model_dict, zeus_data):
-    """Simple unweighted average of a per-cell model dict over every cell
-    that also has ZEUS data, giving one representative x_L curve.
-    """
     total = np.zeros(N_XL); n = 0
     for cell, model in model_dict.items():
         if cell in zeus_data:
@@ -1242,10 +1118,6 @@ def average_over_cells(model_dict, zeus_data):
 
 
 def average_zeus(zeus_data):
-    """Inverse-variance-weighted average of all ZEUS points, rebinned onto
-    XL_EDGES, collapsing every (Q2, x_BJ) cell onto one representative
-    curve.
-    """
     sum_wf = np.zeros(N_XL); sum_w = np.zeros(N_XL)
     for xl_d, f2_d, e_d in zeus_data.values():
         idx = np.clip(np.searchsorted(XL_EDGES[1:], xl_d, side='left'), 0, N_XL - 1)
@@ -1261,11 +1133,6 @@ def average_zeus(zeus_data):
 
 def make_master_overview(combo_results, zeus_data, out,
                           pion_pdf_sets=PION_PDF_SETS, pdf_sets=PDF_SETS):
-    """One figure, one panel per (pion PDF, Pythia PDF) combination: rows =
-    pion PDFs (just JAM21 here), columns = Pythia PDF sets. Each panel
-    shows the cell-averaged raw sum curve (Py+pion), with no overall
-    normalisation, against the cell-averaged ZEUS data.
-    """
     zeus_avg, zeus_err = average_zeus(zeus_data)
     valid = ~np.isnan(zeus_avg)
 
@@ -1313,7 +1180,6 @@ def make_master_overview(combo_results, zeus_data, out,
     plt.close(fig)
 
 
-# MAIN
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -1349,14 +1215,14 @@ def main():
              "ct18": args.ct18, "ct18remnant": args.ct18remnant,
              "ct18gluon": args.ct18gluon}
 
-    # -- ZEUS data ----------------------------------------------------
+    # ZEUS data
     print(f"Loading ZEUS F_2LN data from {args.zdat} "
           f"(F2p sourced from {args.f2ptable}) ...")
     zeus_data = load_zeus_f2ln(args.zdat, f2p_table_file=args.f2ptable)
     print(f"  Loaded {len(zeus_data)} (Q2,x) cells "
           f"({sum(len(v[0]) for v in zeus_data.values())} data points)")
 
-    # -- JAM21 NLO (shared across all PDF sets) ---------------------
+    # JAM21 NLO (shared across all PDF sets)
     have_jam21 = False
     jam_hist = {}
     if not args.no_jam21:
@@ -1371,36 +1237,34 @@ def main():
         print("  WARNING: proceeding without JAM21 -- sum curves will "
               "equal raw Pythia.")
 
-    # -- Pythia (five PDF sets, each streamed in chunks) -------------
     results = process_all_pythia(paths)
     if not results:
         raise SystemExit("No input ROOT files were loaded -- nothing to plot.")
 
-    # -- build the summed model  Pythia_k + JAM21  (no normalisation) --
+    # build the summed model  Pythia_k + JAM21  (no normalisation)
     print("\nBuilding summed model  Pythia + JAM21  (no normalisation) ...")
     finalize_pdf_set(results, jam_hist, zeus_data)
 
-    # -- DIS background only (raw Pythia, all five sets) vs ZEUS -----
+    # DIS background only (raw Pythia, all five sets) vs ZEUS
     print("\nSaving DIS background-only grid ...")
     make_grid_bg_only(results, zeus_data, jam_hist, args.out)
 
-    # -- Summed  Pythia + JAM21  (added curves, all five sets) vs ZEUS -
     print("\nSaving summed  Pythia + JAM21  grid ...")
     make_grid_bg_jam(results, zeus_data, jam_hist, args.out)
 
-    # -- Main small-panel grid: raw Pythia + JAM21 + sum + ZEUS data --
+    # Main small-panel grid: raw Pythia + JAM21 + sum + ZEUS data
     print("\nSaving main F_2LN comparison grid ...")
     make_grid(results, zeus_data, jam_hist, args.out)
 
-    # -- Sum-only small-panel grid ------------------------------------
+    # Sum-only small-panel grid
     print("\nSaving sum-only grid (Pythia_k + JAM21, no normalisation) ...")
     make_grid_sum_only(results, zeus_data, jam_hist, args.out)
 
-    # -- individual cell plots ----------------------------------------
+    # individual cell plots
     print("\nSaving individual cell plots ...")
     make_individual(results, zeus_data, jam_hist, args.out)
 
-    # -- overall chi^2: ZEUS data vs. each Pythia_k + JAM21 sum --------
+    # overall chi^2: ZEUS data vs. each Pythia_k + JAM21 sum
     print("\nComputing overall chi^2 for each Pythia PDF set + JAM21 ...")
     overall_chi2 = compute_overall_chi2(results, zeus_data)
     save_chi2_table(
@@ -1409,7 +1273,7 @@ def main():
         title="Overall chi^2: ZEUS data vs. Pythia PDF-set + JAM21 curves",
     )
 
-    # -- master overview (single pion PDF: JAM21) ---------------------
+    # master overview (single pion PDF: JAM21)
     print("\nSaving combined overview (pion PDF x Pythia PDF) ...")
     combo_results = {"jam21": results}
     make_master_overview(combo_results, zeus_data, args.out)

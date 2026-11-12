@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""Data/theory in the two highest x_L bins of H1 and ZEUS, without and with the shifts
-(n_e, r1, r2) from the H1+ZEUS fit at fixed Lambda.
-
-Figs. 5 and 7: JAM21 with the five fluxes. Figs. 18 and 19: JAM21, xFitter and GRV with
-the s-exp flux.
-"""
 
 import os
 import sys
@@ -20,15 +13,15 @@ from matplotlib.ticker import FixedLocator, FuncFormatter, LogLocator, MaxNLocat
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "common"))
-import lambda_fit as M          # noqa: E402
-import ratio_tools as PF              # noqa: E402
+import lambda_fit as M
+import ratio_tools as PF
 
 LAMBDA = 1.31
 N_XL = 2
 BAND_ALPHA = 0.25
 X_JITTER = 0.96
 PAD_FRAC = 0.06
-PDF_SPECS = [  # label, LHAPDF set, colour, has_band   (as threepdfdt.py)
+PDF_SPECS = [
     ("JAM21",   M.JAM21_SET,          "navy",        True),
     ("xFitter", "xFitterPI_NLO_VAR",  "crimson",     True),
     ("GRV",     "GRVPI1",             "forestgreen", False),
@@ -53,7 +46,7 @@ def curves_for(expt, q2v):
     for lab, sname, col, hb in PDF_SPECS:
         mem = PF.member_curves(sname, expt, q2v)
         if lab == "JAM21":
-            c, lo, hi = PF.band(sname, True, expt, q2v)          # replica mean + 68 % band
+            c, lo, hi = PF.band(sname, True, expt, q2v)  # replica mean + 68 % band
         elif hb:
             c, lo, hi = mem[0], mem.min(axis=0), mem.max(axis=0)  # member 0 + envelope
         else:
@@ -89,23 +82,17 @@ FLUX_SPECS = [  # model, colour, legend label
 
 
 def _interior_ticks(lo, hi, frac=0.10):
-    """Major y ticks kept >= frac of the panel height away from both edges, so the labels of
-    stacked panels never touch (at least 3 ticks if possible).
-    """
     best = None
     for nb in (4, 5, 6, 7, 8):
         t = MaxNLocator(nbins=nb, steps=[1, 2, 2.5, 5, 10]).tick_values(lo, hi)
         t = [v for v in t if lo + frac * (hi - lo) < v < hi - frac * (hi - lo)]
         if len(t) >= 3:
-            return sorted(sorted(t, key=lambda v: abs(v - 1.0))[:3])   # the 3 around y = 1
+            return sorted(sorted(t, key=lambda v: abs(v - 1.0))[:3])  # the 3 around y = 1
         best = best or (t if len(t) >= 2 else None)
     return best
 
 
 def _row_ticks(lo, hi, frac=0.12):
-    """Ticks for a per-row y range: the coarsest 'nice' step that leaves 3 labels (else 2)
-    at least frac of the panel height away from both edges.
-    """
     found = {}
     for nb in range(2, 10):
         t = MaxNLocator(nbins=nb, steps=[1, 2, 2.5, 5, 10]).tick_values(lo, hi)
@@ -119,15 +106,6 @@ def _row_ticks(lo, hi, frac=0.12):
 
 
 def make_figure(D, series, bands, outbase, jitter, ms, q2_label_above_line, split_ylim=False, per_row=False):
-    """Generic 4-column data/theory figure:  [x_L1 x_L2] (no shift) | gap | [x_L1 x_L2] (shifted).
-    series : list of dict(label, color, curve(q2)->central on XPI_GRID, fv{x_L}, sf{x_L})
-    bands  : list of (color, alpha, func(q2)->(central, lo, hi))  -- relative bands, drawn in every panel.
-    split_ylim : the shifted group gets its own y range, with its tick labels in the gap
-                 (left of the first shifted column)
-                 (the no-shift group keeps the shared range).
-    per_row    : every Q^2 row has its own y range, separately for the no-shift and the
-                 shifted group (implies split_ylim).
-    """
     expt = D["expt"]
     xls = sorted(set(D["x_l"]), reverse=True)[:N_XL]
     q2s = sorted(set(D["q2"]))
@@ -137,7 +115,6 @@ def make_figure(D, series, bands, outbase, jitter, ms, q2_label_above_line, spli
     def theory(sr, q2v, xd, xl, shifted):
         return sr["fv"][xl] * np.interp(xd, PF.XPI_GRID, sr["curve"](q2v)) * (sr["sf"][xl] if shifted else 1.0)
 
-    # y range: shared over both groups, or one per group (split_ylim)
     def y_range(group, rows=None):
         yv = [1.0]
         for xl, shifted in cols:
@@ -145,7 +122,7 @@ def make_figure(D, series, bands, outbase, jitter, ms, q2_label_above_line, spli
                 continue
             yv += _y_values(xl, shifted, rows)
         y_lo, y_hi = min(yv), max(yv)
-        if y_hi - y_lo < 0.3:                                    # (nearly) empty row: keep a sensible span
+        if y_hi - y_lo < 0.3:  # (nearly) empty row: keep a sensible span
             c = 0.5 * (y_hi + y_lo)
             y_lo, y_hi = c - 0.15, c + 0.15
         pad = max(PAD_FRAC * (y_hi - y_lo), 0.02)
@@ -174,12 +151,11 @@ def make_figure(D, series, bands, outbase, jitter, ms, q2_label_above_line, spli
     if per_row:
         row_ylim = {(i, sh): y_range({sh}, [q2v]) for i, q2v in enumerate(q2s) for sh in (False, True)}
     if split_ylim:
-        ylims = {False: y_range({False, True}), True: y_range({True})}   # no-shift group: as before
+        ylims = {False: y_range({False, True}), True: y_range({True})}  # no-shift group
     else:
         ylims = dict.fromkeys((False, True), y_range({False, True}))
 
-    # layout: 2 columns | gap | 2 columns, no space inside each pair
-    PW, PH, GAP = 2.8, 0.95, (0.75 if split_ylim else 0.45)     # wider gap holds the shifted-group labels
+    PW, PH, GAP = 2.8, 0.95, (0.75 if split_ylim else 0.45)  # wider gap holds the shifted-group labels
     ML, MR, MB, MT = 0.95, 0.12, 0.75, 0.80
     nr = len(q2s)
     fw = ML + 4 * PW + GAP + MR
@@ -220,9 +196,9 @@ def make_figure(D, series, bands, outbase, jitter, ms, q2_label_above_line, spli
             ax.set_xscale("log")
             ax.set_xlim(*xlim)
             ax.set_ylim(*ylim)
-            if per_row:                                                # own scale per row: ticks clear of the edges
+            if per_row:
                 ax.yaxis.set_major_locator(FixedLocator(_row_ticks(*ylim)))
-            elif split_ylim and shifted:                               # own scale: ticks clear of the edges
+            elif split_ylim and shifted:  # own scale: ticks clear of the edges
                 ax.yaxis.set_major_locator(FixedLocator(_interior_ticks(*ylim)))
             else:
                 ax.yaxis.set_major_locator(MaxNLocator(nbins=4, steps=[1, 2, 2.5, 5, 10], prune="both"))
@@ -230,12 +206,12 @@ def make_figure(D, series, bands, outbase, jitter, ms, q2_label_above_line, spli
             ax.xaxis.set_major_locator(LogLocator(base=10.0, numticks=12))
             ax.xaxis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1, numticks=12))
             ax.xaxis.set_minor_formatter(NullFormatter())
-            ax.xaxis.set_major_formatter(FuncFormatter(_odd_log_fmt))   # 10^-3, 10^-1: never on a panel edge
+            ax.xaxis.set_major_formatter(FuncFormatter(_odd_log_fmt))  # 10^-3, 10^-1: never on a panel edge
             ax.tick_params(which="both", top=True, right=True, direction="in")
             ax.tick_params(which="major", length=5, width=1.0)
             ax.tick_params(which="minor", length=2.5, width=0.8)
             ax.tick_params(labelbottom=(i == nr - 1), labelleft=(k == 0))
-            if split_ylim and k == 2:                                  # shifted group: own scale, labels in the gap
+            if split_ylim and k == 2:
                 ax.tick_params(labelleft=True)
             ha, xp = ("left", 0.03) if hi_x else ("right", 0.97)
             if i == 0 and k == 0:
@@ -244,7 +220,7 @@ def make_figure(D, series, bands, outbase, jitter, ms, q2_label_above_line, spli
                 yp = min(0.97, (1.0 - ylim[0]) / (ylim[1] - ylim[0]) + 0.06)
                 ax.text(xp, yp, rf"$Q^2={q2v:g}$", transform=ax.transAxes, ha=ha, va="bottom",
                         fontsize=8, fontweight="bold")
-            else:                                                      # threepdfdt.py placement
+            else:
                 ax.text(xp, 0.12, rf"$Q^2={q2v:g}$", transform=ax.transAxes, ha=ha, va="bottom",
                         fontsize=9, fontweight="bold")
             if i == 0:
@@ -318,14 +294,13 @@ def five_flux_figure(D, shifts, outbase):
         series.append(dict(label=lab, color=col, curve=(lambda q: jam(q)[0]),
                            fv={xl: 2.0 * M.flux(float(xl), model, lam, expt) for xl in xls},
                            sf={xl: PF.shift_factor(shifts, "JAM21", model, expt, xl) for xl in xls}))
-    bands = [("yellow", 0.85, jam)]                  # JAM21 replica band (flux independent)
-    # Q^2 label: above the y=1 line for ZEUS, near the panel bottom for H1
+    bands = [("yellow", 0.85, jam)]  # JAM21 replica band (flux independent)
     make_figure(D, series, bands, outbase, jitter=0.94, ms=2.2, q2_label_above_line=(expt == "ZEUS"),
                 split_ylim=True)
 
 
 def main():
-    shifts = PF.shift_table("paperLambda")      # Lambda fixed at the Table 1 values
+    shifts = PF.shift_table("paperLambda")  # Lambda fixed at the Table 1 values
     for D in (PF.zeus_all(), PF.h1_all()):
         three_pdf_figure(D, shifts, os.path.join(
             HERE, f"data_over_theory_3pdf_sexp_{D['expt']}_top2xL_noshift_vs_shift"))

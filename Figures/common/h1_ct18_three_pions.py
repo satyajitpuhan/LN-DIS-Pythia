@@ -17,21 +17,19 @@ from scipy.integrate import quad
 
 warnings.filterwarnings('ignore')
 
-# FONT SIZES -- house style,
-# scaled up for the much larger 4.8 x 4.0 inch panels used here.
-# Everything is bold.
-FS_AXLABEL = 42     # F_2^LN(...) and x_L axis labels
-FS_TITLE   = 28     # Q^2 column titles
-FS_ROWLAB  = 26     # x_B row labels
-FS_TICK    = 24     # x and y tick numbers
-FS_LEGEND  = 24     # the one shared corner legend
+# FONT SIZES
+FS_AXLABEL = 42  # F_2^LN(...) and x_L axis labels
+FS_TITLE   = 28  # Q^2 column titles
+FS_ROWLAB  = 26  # x_B row labels
+FS_TICK    = 24  # x and y tick numbers
+FS_LEGEND  = 24  # the one shared corner legend
 
 matplotlib.rcParams.update({
     "font.family"         : "serif",
     "font.serif"          : ["Times New Roman", "DejaVu Serif"],
     "font.weight"         : "bold",
     "mathtext.fontset"    : "dejavuserif",
-    "mathtext.default"    : "bfit",      # bold *italic* math (H1 style)
+    "mathtext.default"    : "bfit",  # bold *italic* math (H1 style)
     "axes.labelsize"      : FS_ROWLAB,
     "axes.labelweight"    : "bold",
     "axes.titlesize"      : FS_TITLE,
@@ -51,40 +49,29 @@ matplotlib.rcParams.update({
     "legend.edgecolor"    : "0.45",
     "legend.fontsize"     : FS_LEGEND,
     "figure.dpi"          : 150,
-    "axes.linewidth"      : 3.2,     # bold panel boundaries
+    "axes.linewidth"      : 3.2,  # bold panel boundaries
 })
 
-# Panel frame / curve / data-point weights -- deliberately heavy so the
-# curves and points read clearly at this figure size.
-SPINE_LW   = 3.2     # panel box -- deliberately heavy
-LW_BKG     = 2.6     # CT18 NLO background (dashed grey)
-LW_PION    = 3.2     # raw pion-PDF histograms
-LW_SUM     = 3.2     # CT18 + pion sums
-DATA_MS    = 7.0     # H1 marker size
+SPINE_LW   = 3.2  # panel box
+LW_BKG     = 2.6  # CT18 NLO background (dashed grey)
+LW_PION    = 3.2  # raw pion-PDF histograms
+LW_SUM     = 3.2  # CT18 + pion sums
+DATA_MS    = 7.0  # H1 marker size
 DATA_MEW   = 1.5
-DATA_ELW   = 2.0     # error-bar line width
+DATA_ELW   = 2.0  # error-bar line width
 DATA_CAPS  = 3.5
 
-# CONSTANTS
 N_TOTAL = 500_000_000
 
 C_DATA     = "black"
 
-# Extra stroke width applied to the x / y axis labels so they render heavier
-# WITHOUT changing their font size. Raise for even bolder, 0.0 to disable.
 AXIS_LABEL_STROKE = 1.1
-C_CT18_BKG = "#555555"   # grey - CT18 NLO Pythia DIS background (grid 1)
+C_CT18_BKG = "#555555"  # grey
 
-# The proton PDF sets this script can run over. Each one is processed
-# independently and written under its own output prefix, so the CT18 NLO
-# figures and the CT18 NLO + Gluon figures sit side by side rather than
-# overwriting each other.
 PDF_SETS = [
     ("ct18", "CT18 NLO", "#d62728"),
 ]
 
-# Pythia proton PDF sets with H1 comparison colors
-# Used for multi-PDF comparison grids
 PYTHIA_FILES = [
     dict(path=os.path.join(PYTHIA_OUT, "h1_default.root"),
          label="Pythia default", color="#1f77b4"),
@@ -98,17 +85,10 @@ PYTHIA_FILES = [
          label="CT18NLO + Gluon", color="#17becf"),
 ]
 
-# Display name of the proton PDF currently being drawn. run_one_proton_pdf()
-# swaps this before each pass so every legend entry, chi^2 row and console
-# line says which Pythia set the curves came from.
 CT18_LABEL = "CT18 NLO"
 
-# The three pion PDFs (key, LHAPDF-set-name, display label, colour).
-# The NLO F2^pi + LN-flux machinery below is pion-PDF-independent, so all
-# three are handled by exactly the same code path.
-# Colors: JAM21 deep blue (original), xFitter orange, GRV purple
 PION_PDF_SETS = [
-    ("jam21",   "JAM21PionPDFnlo", "JAM21",   "#0a7cff"),  # deep blue (original)
+    ("jam21",   "JAM21PionPDFnlo", "JAM21",   "#0a7cff"),  # deep blue
     ("xfitter", "xFitterPI_NLO_VAR",  "xFitter", "#ff7f0e"),  # orange
     ("grv",     "GRVPI1",             "GRV",     "#9467bd"),  # purple
 ]
@@ -158,10 +138,9 @@ XL_EDGES = np.array([0.32, 0.41, 0.50, 0.59, 0.68, 0.77, 0.86, 0.95])
 XL_CTRS  = 0.5 * (XL_EDGES[:-1] + XL_EDGES[1:])
 XL_XERR  = 0.5 * (XL_EDGES[1:]  - XL_EDGES[:-1])
 XL_BWS   = XL_EDGES[1:] - XL_EDGES[:-1]
-N_XL     = len(XL_CTRS)   # 7
+N_XL     = len(XL_CTRS)
 
 
-# HELPERS
 def pick(av, candidates):
     for c in candidates:
         if c in av: return c
@@ -189,11 +168,7 @@ def dsig_to_f2ln(dsig_per_xl, x, Q2, dx, dQ2):
     P   = dis_prefactor(x, Q2)
     return np.asarray(dsig_per_xl, dtype=float) / (P * kin * dx * dQ2)
 
-# PYTHIA LOADER  (chunked / low-memory streaming - one call per PDF set)
-# Streams the tree in chunks with uproot.iterate() instead of loading every
-# branch into RAM at once. Memory use stays flat regardless of how many
-# events are in the ROOT file (only small per-cell histograms accumulate).
-CHUNK_STEP_SIZE = 200_000   # rows per chunk (plain int); lower further (e.g. 50_000) if still tight on RAM
+CHUNK_STEP_SIZE = 200_000
 
 def _peak_rss_mb():
     import resource
@@ -451,18 +426,15 @@ def _pion_f2ln_pointwise(pdf_obj, xL, xbj, q2):
 try:
     import f2pi_nlo
     _HAVE_GPU_PATH = True
-except Exception as _e:                                  # pragma: no cover
+except Exception as _e:
     print(f"  NOTE: f2pi_nlo unavailable ({_e}); using the slow CPU path.")
     _HAVE_GPU_PATH = False
 
-# Set to False to force the original scipy.quad implementation.
+# Set to False to force the original scipy.quad implementation
 USE_FAST_F2PI = True
 
 
 def rebin_pion_to_xl_edges(pdf_obj, n_sub=12, label=""):
-    """Batched (GPU/vectorised) rebin, falling back to the original
-    scipy.quad loop if f2pi_nlo can't be imported or USE_FAST_F2PI is off.
-    """
     if USE_FAST_F2PI and _HAVE_GPU_PATH:
         print(f"    [{label}] backend: {f2pi_nlo.backend_name()}", flush=True)
         return f2pi_nlo.rebin_pion_to_xl_edges_fast(
@@ -472,9 +444,7 @@ def rebin_pion_to_xl_edges(pdf_obj, n_sub=12, label=""):
 
 
 def rebin_pion_to_xl_edges_cpu(pdf_obj, n_sub=12, label=""):
-    """Original per-point scipy.quad implementation. Kept as the reference
-    the batched path is verified against.
-    """
+    """Original per-point scipy.quad implementation."""
     import time
     jam_hist = {}
     n_cells  = len(X_MEANS) * len(Q2_MEANS)
@@ -499,9 +469,6 @@ def rebin_pion_to_xl_edges_cpu(pdf_obj, n_sub=12, label=""):
 
 
 def load_pion_pdf_hists(pion_pdf_sets=PION_PDF_SETS, skip_keys=()):
-    """Loads every pion PDF in `pion_pdf_sets` via LHAPDF (member 0) and builds
-    its rebinned F2LN histogram per (iq, ix) cell.
-    """
     hists = {}
     for key, pdfname, label, _ in pion_pdf_sets:
         if key in skip_keys:
@@ -518,11 +485,7 @@ def load_pion_pdf_hists(pion_pdf_sets=PION_PDF_SETS, skip_keys=()):
 
 
 def _largest_empty_block_at(cell_has_data, corner="top-left"):
-    """Largest fully-empty rectangle of (row, iq) cells anchored at one corner
-    of the grid. The staircase kinematic layout always leaves the top-left
-    and bottom-right corners empty, which is where the F_2^LN label and the
-    legend live.
-    """
+    """Largest fully-empty rectangle of (row, iq) cells anchored at one corner of the grid."""
     def _all_empty(cells):
         return all(not cell_has_data.get(c, False) for c in cells)
 
@@ -547,12 +510,6 @@ def _largest_empty_block_at(cell_has_data, corner="top-left"):
 
 
 def _largest_corner_empty_block(cell_has_data):
-    """Return the list of (row, iq) cells forming the largest fully-empty
-    rectangle anchored at either the bottom-right or the top-left corner
-    of the grid (whichever is bigger). The staircase kinematic layout
-    always leaves those two corners empty, so this is where the legend
-    can live without covering any panel.
-    """
     blocks = [b for b in (_largest_empty_block_at(cell_has_data, "bottom-right"),
                           _largest_empty_block_at(cell_has_data, "top-left"))
               if b]
@@ -573,22 +530,18 @@ def _block_centre(axes, block):
 
 def _place_f2_label_top_left(fig, axes, cell_has_data, text, fontsize,
                              stroke=None):
-    """Put the F_2^LN axis label INSIDE the empty top-left staircase corner,
-    horizontal -- the way the published H1 figure does it -- instead of
-    rotated out at the far left figure margin. Also places "H1" label above it.
-    """
     block = _largest_empty_block_at(cell_has_data, "top-left")
     if not block:
         return False
 
     cx, cy = _block_centre(axes, block)
-    
+
     # Place "H1" label above F_2LN label
     t_h1 = fig.text(cx, cy + 0.08, "H1", ha="center", va="center",
                     fontsize=fontsize, fontweight="bold")
     if stroke:
         t_h1.set_path_effects(stroke)
-    
+
     # Place F_2LN label below H1
     t = fig.text(cx, cy, text, ha="center", va="center",
                  fontsize=fontsize, fontweight="bold")
@@ -598,9 +551,6 @@ def _place_f2_label_top_left(fig, axes, cell_has_data, text, fontsize,
 
 
 def _place_legend_in_empty_space(fig, axes, cell_has_data, source_ax):
-    """Grab the curve handles from a populated panel and draw one big, bold
-    legend centred in the largest empty corner block.
-    """
     handles, labels = source_ax.get_legend_handles_labels()
     if not handles:
         return
@@ -641,42 +591,22 @@ def _place_legend_in_empty_space(fig, axes, cell_has_data, source_ax):
 
 
 def _xl_tick_fmt(v, pos):
-    """Bold x_L tick labels: 0.50, 0.75, 1 -- whole numbers lose the
-    trailing '.00' (H1 style).
-    """
     if abs(v - round(v)) < 1e-9:
         return rf"$\mathbf{{{int(round(v))}}}$"
     return rf"$\mathbf{{{v:.2f}}}$"
 
 
 def _q2_label_bold(lo, hi):
-    # No "GeV^2" -- it made the title wider than the panel, so neighbouring
-    # column titles ran into each other.
+    # No "GeV^2"
     return rf"$Q^2 \in [{lo:.4g},\,{hi:.4g}]$"
 
 
 def _xb_label_bold(lo, hi):
-    # Horizontal, split over TWO lines so it stays narrow enough to sit in
-    # the empty cell to the left of each row without overlapping anything.
     return rf"$x_B \in [{sci(lo)},$" + "\n" + rf"${sci(hi)}]$"
 
 
-# CELL DRAWING
-#   mode='pions' : CT18 NLO background (grey, dashed) + three pion PDF
-#                  histograms (JAM21 / xFitter / GRV) + H1 data
-#   mode='sums'  : three summed curves  CT18 NLO + pion  (one solid
-#                  colour per pion PDF, no normalisation) + H1 data
 def _draw_cell_three(ax, ct18_f2ln, pion_hists, cell, h1_cell, mode,
                      show_legend=False, legend_fontsize=6):
-    """mode='pions' : CT18 bkg (dashed) + 3 raw pion histograms
-    mode='sums'  : 3 summed curves CT18+pion (solid)
-    mode='both'  : CT18 bkg (dashed) + 3 raw pion histograms (thin, dotted)
-                   + 3 summed curves (thick, solid) - everything in one
-                   panel, as in the individual per-cell plots.
-    show_legend  : draw a per-axes legend (used for standalone individual
-                   plots; the 7x7 grids instead use one shared figure-level
-                   legend, so they leave this False).
-    """
     py = ct18_f2ln.get(cell)
 
     if mode in ("pions", "both"):
@@ -704,27 +634,20 @@ def _draw_cell_three(ax, ct18_f2ln, pion_hists, cell, h1_cell, mode,
     # H1 data (always)
     if h1_cell is not None:
         xL_h1, F2_h1, stat_h1, tot_h1 = h1_cell
-        # EXACTLY the H1 / ZEUS data-point style: filled black circles with a
-        # single VERTICAL (total) error bar -- no horizontal x error bars,
-        # which is what previously made these look like crosses instead of dots.
         ax.errorbar(xL_h1, F2_h1, yerr=tot_h1,
                     fmt="o", ms=DATA_MS, mfc="black", mec="black",
                     mew=DATA_MEW, ecolor="black", elinewidth=DATA_ELW,
                     capsize=DATA_CAPS, capthick=DATA_ELW,
                     color="black", zorder=10, label="H1 data")
 
-    # x range extended to 1.0 so the 1.00 tick actually has somewhere to sit
-    # (the x_L bins only reach 0.95).
     ax.set_xlim(XL_EDGES[0] - 0.02, 1.0)
     ax.set_ylim(0., 0.14)
     ax.set_facecolor("white")
 
-    # Bold panel boundary.
+    # Bold panel boundary
     for sp in ax.spines.values():
         sp.set_linewidth(SPINE_LW)
 
-    # y ticks are kept off the panel edges: with hspace=0 the panels share
-    # borders, so an end label would collide with the neighbour's.
     ax.set_xticks([0.50, 0.75, 1.00])
     ax.xaxis.set_major_formatter(FuncFormatter(_xl_tick_fmt))
     ax.set_yticks([0.03, 0.06, 0.09, 0.12])
@@ -744,8 +667,6 @@ def _draw_cell_three(ax, ct18_f2ln, pion_hists, cell, h1_cell, mode,
                   borderpad=0.3, framealpha=0.85, labelspacing=0.25)
 
 
-# 7x7 GRID  (staircase layout: empty panels hidden, bold labels, one big
-# bold legend placed in the largest empty corner)
 def _make_grid_three_generic(ct18_f2ln, pion_hists, h1_data, out, suffix, mode):
     fig, axes = plt.subplots(NX, NQ,
                              figsize=(NQ * 4.8, NX * 4.0),
@@ -753,14 +674,13 @@ def _make_grid_three_generic(ct18_f2ln, pion_hists, h1_data, out, suffix, mode):
                              sharex=False, sharey=False)
     fig.patch.set_facecolor("white")
 
-    # which (row, iq) panels actually have H1 data points
     cell_has_data = {}
     for ix in range(NX):
         row = NX - 1 - ix
         for iq in range(NQ):
             cell_has_data[(row, iq)] = h1_data.get((iq, ix)) is not None
 
-    # first data-bearing panel (reading order) - legend handles source
+    # first data-bearing panel (reading order)
     legend_cell = None
     for row in range(NX):
         for iq in range(NQ):
@@ -808,13 +728,6 @@ def _make_grid_three_generic(ct18_f2ln, pion_hists, h1_data, out, suffix, mode):
 
             if iq == first_visible_col.get(row):
                 xlo, xhi = X_BINS[ix]
-                # Horizontal, two-line label parked in the empty cell to the
-                # left of this row. set_ylabel would rotate it 90 deg and
-                # stack every row's label on the same figure-left strip,
-                # which is what made them overlap each other.
-                # x = -0.26 clears the y tick numbers: at FS_TICK=24 a label
-                # like "0.09" is ~0.55 in wide plus pad, and -0.14 left its
-                # right edge sitting right on top of them.
                 ax.text(-0.26, 0.5, _xb_label_bold(xlo, xhi),
                         transform=ax.transAxes, ha="right", va="center",
                         rotation=0, linespacing=1.4,
@@ -828,20 +741,13 @@ def _make_grid_three_generic(ct18_f2ln, pion_hists, h1_data, out, suffix, mode):
     if legend_source_ax is not None:
         _place_legend_in_empty_space(fig, axes, cell_has_data, legend_source_ax)
 
-    # -- global, bold axis labels, anchored to the *visible* panel block --
-    # fig.supx/ylabel sit at the figure margins, which fall far out in the
-    # empty staircase corners. Instead we place the labels just outside the
-    # tight bounding box of the visible panels (which already includes their
-    # tick labels and row/column labels), so they hug the plotted region.
     from matplotlib.transforms import Bbox
     vis = [ax for ax in axes.flat if ax.get_visible()]
 
-    # plot-area centre (bare axes positions, for centring the labels)
     pos = [ax.get_position() for ax in vis]
     cx = 0.5 * (min(p.x0 for p in pos) + max(p.x1 for p in pos))
     cy = 0.5 * (min(p.y0 for p in pos) + max(p.y1 for p in pos))
 
-    # outer edge of everything drawn (axes + their tick / row / column labels)
     try:
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
@@ -854,9 +760,6 @@ def _make_grid_three_generic(ct18_f2ln, pion_hists, h1_data, out, suffix, mode):
         uy0 = min(p.y0 for p in pos) - 0.03
 
     pad = 0.010
-    # Same font size as before, but stroked so the glyphs render heavier and
-    # read clearly against the big grid (mathtext has no weight above bold,
-    # so extra weight has to come from a stroke).
     _lbl_stroke = [patheffects.withStroke(linewidth=AXIS_LABEL_STROKE,
                                           foreground="black")]
 
@@ -865,9 +768,6 @@ def _make_grid_three_generic(ct18_f2ln, pion_hists, h1_data, out, suffix, mode):
                    fontweight="bold")
     t_x.set_path_effects(_lbl_stroke)
 
-    # F_2^LN goes INSIDE the empty top-left staircase corner (H1 style),
-    # horizontal. Only if that corner does not exist do we fall back to the
-    # old rotated label out at the left figure margin.
     _f2_text = r"$F_{2}^{LN}(x_B,\,Q^{2},\,x_L)$"
     if not _place_f2_label_top_left(fig, axes, cell_has_data, _f2_text,
                                     FS_AXLABEL, stroke=_lbl_stroke):
@@ -895,9 +795,6 @@ def make_grid_ct18_plus_pions(ct18_f2ln, pion_hists, h1_data, out):
                              suffix="_ct18_plus_three_pions", mode="sums")
 
 
-# PLOT - 49 INDIVIDUAL CELL PLOTS  (make_individual(): one standalone PNG/PDF per (Q^2, x_B) cell, each
-# showing CT18 bkg + all 3 raw pion PDFs + all 3 CT18+pion sums + H1,
-# with its own legend - no staircase hiding, no shared corner legend.)
 def make_individual(ct18_f2ln, pion_hists, h1_data, out):
     ind_dir = f"{out}_f2ln_individual"
     os.makedirs(ind_dir, exist_ok=True)
@@ -924,12 +821,8 @@ def make_individual(ct18_f2ln, pion_hists, h1_data, out):
     print(f"  → {ind_dir}/  ({NQ*NX} plots)")
 
 
-# CHI^2  (H1 data vs. each of the three CT18 NLO + pion sums)
 def compute_chi2_ct18_plus_pions(ct18_f2ln, pion_hists, h1_data):
-    """For each pion PDF (JAM21 / xFitter / GRV), compute the overall chi^2 of
-    H1 data vs. the summed curve  CT18 NLO + pion  - exactly the curve
-    drawn in make_grid_ct18_plus_pions() (mode='sums').
-    """
+    """For each pion PDF (JAM21 / xFitter / GRV), compute the overall chi^2 of H1 data vs."""
     results = {}
     for key, _pdfname, label, _color in PION_PDF_SETS:
         h_dict = pion_hists.get(key)
@@ -970,9 +863,7 @@ def compute_chi2_ct18_plus_pions(ct18_f2ln, pion_hists, h1_data):
 
 
 def save_chi2_table(results, out_path, title=""):
-    """Write an overall chi^2 summary (one row per PDF-set curve) to a
-    plain-text file.
-    """
+    """Write an overall chi^2 summary (one row per PDF-set curve) to a plain-text file."""
     with open(out_path, "w") as f:
         if title:
             f.write(f"{title}\n")
@@ -986,24 +877,11 @@ def save_chi2_table(results, out_path, title=""):
     print(f"  → {out_path}")
 
 
-# ONE COMPLETE PASS FOR A SINGLE PROTON PDF
-# Everything below the pion-PDF stage depends only on which Pythia ROOT
-# file is being read, so a full set of outputs is produced per proton PDF
-# and written under its own `out` prefix. The pion histograms are computed
-# ONCE in main() and reused here -- they are a property of the pion PDF and
-# the (Q^2, x_B) grid, not of the proton PDF, so recomputing them per pass
-# would repeat the slowest step in the script for no reason.
 def run_one_proton_pdf(root_path, label, out, pion_hists, h1_data,
                        make_individual_plots=True):
-    """Runs the complete output set for one Pythia proton PDF:
-    <out>_f2ln_grid7x7_three_pion_pdfs.png / .pdf
-    <out>_f2ln_grid7x7_<key>_plus_three_pions.png / .pdf
-    <out>_chi2_<key>_plus_three_pions.txt
-    <out>_f2ln_individual/            (49 per-cell plots)
-    """
     global CT18_LABEL
     previous_label = CT18_LABEL
-    CT18_LABEL = label          # every legend / chi^2 row picks this up
+    CT18_LABEL = label  # every legend / chi^2 row picks this up
 
     try:
         print(f"\n{'=' * 70}")
@@ -1051,7 +929,6 @@ def _slug(label):
     return out.strip("_")
 
 
-# MAIN
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -1075,24 +952,18 @@ def main():
                         help="Run just one proton PDF instead of both")
     args = parser.parse_args()
 
-    # -- H1 data ----------------------------------------------------
+    # H1 data
     print(f"Loading H1 data from {args.hdat} ...")
     h1_data = load_hdat_f2ln(args.hdat)
     print(f"  Loaded {len(h1_data)} cells")
 
-    # -- three pion PDFs (JAM21 / xFitter / GRV) --------------------
-    # Computed ONCE and shared by every proton-PDF pass below: the pion
-    # F_2^LN histograms depend only on the pion PDF and the (Q^2, x_B)
-    # grid, never on which Pythia ROOT file we read. This is by far the
-    # slowest stage, so recomputing it per pass would roughly double the
-    # runtime for identical numbers.
     print("\nComputing three pion-PDF F_2LN histograms (JAM21 / xFitter / GRV) ...")
     pion_hists = load_pion_pdf_hists(PION_PDF_SETS)
     if not pion_hists:
         raise SystemExit("No pion PDFs could be loaded — nothing to plot.")
     print(f"  Loaded pion PDFs: {', '.join(pion_hists.keys())}")
 
-    # -- one full output set per proton PDF, under its own prefix ---
+    # one full output set per proton PDF, under its own prefix
     passes = []
     if args.only in ("ct18", "both"):
         passes.append((args.ct18,      "CT18 NLO",          args.out))

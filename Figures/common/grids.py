@@ -1,5 +1,6 @@
 """Helpers shared by the H1 and ZEUS grid figures: Pythia F2LN(3) from the stored count
-histograms, the bin-averaged Sullivan term, and the plotting functions of the original scripts."""
+histograms, the bin-averaged Sullivan term, and the plotting functions of the original scripts.
+"""
 import glob
 import importlib.util
 import os

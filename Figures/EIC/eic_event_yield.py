@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""d2N/dx_B dQ^2 for the three EIC beam settings, before and after the fiducial cuts (Fig. 12).
-
-Usage: python3 eic_event_yield.py [5x41.root 10x100.root 18x275.root]
-"""
+"""d2N/dx_B dQ^2 for the three EIC beam settings, before and after the fiducial cuts (Fig. 12)."""
 
 import os
 PYTHIA_OUT = os.environ.get("PYTHIA_OUT", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Pythia", "output"))
@@ -26,47 +23,36 @@ FILES = sys.argv[1:] or [
 TREENAME = "tree"
 OUTDIR = "plots"
 
-CHUNK_SIZE = 2_000_000      # rows per uproot.iterate() chunk
-RESERVOIR_CAP = 300_000     # only used when MAKE_COMPARISONS is True
+CHUNK_SIZE = 2_000_000  # rows per uproot.iterate() chunk
+RESERVOIR_CAP = 300_000  # only used when MAKE_COMPARISONS is True
 
 # Acceptance cuts
-THETA_E_MIN_DEG = 135.0     # deg
-THETA_E_MAX_DEG = 178.0     # deg
-EEPRIME_MIN = 1.0           # GeV
-THETA_N_MAX_MRAD = 5.0      # mrad -- fallback; see CFG_THETA_N_MRAD
+THETA_E_MIN_DEG = 135.0  # deg
+THETA_E_MAX_DEG = 178.0  # deg
+EEPRIME_MIN = 1.0  # GeV
+THETA_N_MAX_MRAD = 5.0  # mrad
 
-# Set False if the theta_e' acceptance window should NOT be applied at all.
-# When True, the window is applied AND listed in the CUT_TEXT annotation box.
 APPLY_THETA_E_CUT = True
 
 USE_WEIGHTS = False
 
 # radiative tail removal
 DROP_RADIATIVE = True
-Q2_GEN_MIN = 1.0            # GeV^2, effective generated floor
+Q2_GEN_MIN = 1.0  # GeV^2, effective generated floor
 XB_MAX_PHYS = 1.0
 
 # density normalisation
-#     per-event weight  w = sigma_gen[nb] * 1e6 [fb/nb] * L[fb^-1] / N_generated
-#     density           = sum(w) / (dxB * dQ2)      <- LINEAR bin widths
-LUMI_FB = 10.0              # fb^-1
+LUMI_FB = 10.0  # fb^-1
 
-COMPARE_MODE = "counts"     # only relevant if MAKE_COMPARISONS is True
+COMPARE_MODE = "counts"
 
 # x_L binning
-# This script has no dsigma/dx_L figure: its only x_L histogram is the optional
-# 1D overlay (MAKE_COMPARISONS), whose bins otherwise come from reservoir
-# percentiles. Pin them to a uniform width so that plot matches the x_L binning
-# used elsewhere.
 XL_DELTA = 0.02
 XL_EDGES = np.round(np.arange(0.0, 1.0 + 0.5 * XL_DELTA, XL_DELTA), 6)
 
-# Iso-y lines:  Q^2 = xB * y * s   (drawn as red lines with inline labels;
-# the legend box that used to explain them has been removed)
 DRAW_Y_LINES = True
 Y_LINES = [1.0, 0.5, 0.1, 0.01]
 
-# Common axes for all beam configs, so the columns can be compared by eye.
 XB_LIM = (1e-5, 1.0)
 Q2_LIM = (0.8, 1e4)
 X_EDGES = np.logspace(np.log10(XB_LIM[0]), np.log10(XB_LIM[1]), 61)
@@ -75,15 +61,14 @@ Q2_EDGES = np.logspace(np.log10(max(Q2_GEN_MIN, Q2_LIM[0])),
 
 # figure options
 UNIVERSAL_AXIS_LABELS = True  # one x_B / Q^2 label for the whole figure
-COMMON_COLOR_SCALE = False   # True -> one shared LogNorm range for all 6 panels
-CUTS_ON_EVERY_CUT_PANEL = True   # each column now has its OWN theta_n cut,
-                                 # so every cut panel shows its own box
+COMMON_COLOR_SCALE = False
+CUTS_ON_EVERY_CUT_PANEL = True
 MAKE_PER_ENERGY_ROW = False  # the old 1x4 per-file figures
-MAKE_COMPARISONS = False     # the old 1D overlays (needs a 2nd pass per file)
+MAKE_COMPARISONS = False
 
 COLORS = ["black", "#d62728", "#0096FF", "#2ca02c", "#9467bd", "#ff7f0e"]
 
-# Style -- everything bold (ticks, labels, titles, annotations)
+# Style
 
 plt.rcParams.update({
     "figure.dpi": 150,
@@ -110,15 +95,14 @@ plt.rcParams.update({
     "ytick.right": True,
 })
 
-# math text bold as well, otherwise $10^{-3}$ tick labels and $x_B$ stay light.
 try:
-    plt.rcParams["mathtext.default"] = "bf"     # bold upright
+    plt.rcParams["mathtext.default"] = "bf"  # bold upright
 except ValueError:
     pass
 
 
 def bold_ticks(ax, labelsize=10):
-    """Force every tick label on ax (incl. mathtext ones) to render bold."""
+    """Bold tick labels on ax."""
     ax.tick_params(which="both", labelsize=labelsize)
     for lab in list(ax.get_xticklabels(which="both")) + \
                list(ax.get_yticklabels(which="both")):
@@ -183,10 +167,6 @@ def guess_beams(s):
     return None, None
 
 
-# The neutron angular acceptance is per beam config: the faster the proton
-# beam, the smaller the angle a given p_T subtends. Keyed by the tag that
-# guess_beams() produces; THETA_N_MAX_MRAD above is the fallback for a config
-# that is not listed here.
 CFG_THETA_N_MRAD = {
     "5x41":   5.0,
     "10x100": 2.5,
@@ -201,9 +181,6 @@ def theta_n_max_for(s):
 
 
 def chunk_derive(raw, n_chunk, theta_n_max=None):
-    """Pure function of ONE chunk: cuts, radiative mask, weights, and the
-    derived per-event observable dict.
-    """
     theta_e_deg = np.degrees(raw["theta_e"])
     theta_n_mrad = 1000.0 * raw["theta_n"]
 
@@ -242,7 +219,7 @@ def chunk_derive(raw, n_chunk, theta_n_max=None):
         "nNeutrons":    raw["nNeutrons"].astype(float),
         "xpi":          raw["xpi"],
     }
-    for k in ("rapidity_e", "rapidity_n"):        # a.cpp sentinels
+    for k in ("rapidity_e", "rapidity_n"):  # sentinel values written by the generator
         d[k] = np.where(d[k] < -900, np.nan, d[k])
     d["xpi"] = np.where(d["xpi"] <= 0, np.nan, d["xpi"])
     d = {k: np.asarray(v, dtype=float) for k, v in d.items()}
@@ -259,7 +236,7 @@ def reservoir_update(buf, new_vals):
     return combined[idx]
 
 
-# Pass 1 -- 2D histograms (exact, fixed bins) + scalar stats
+# Pass 1
 
 def load_pass1(path, color):
     print(f"[info] opening {path}:{TREENAME}")
@@ -320,7 +297,7 @@ def load_pass1(path, color):
             r["H2D"][cutstate] += H
             r["n2D"][cutstate] += int(g.sum())
 
-            if MAKE_COMPARISONS:      # reservoirs only needed for the overlays
+            if MAKE_COMPARISONS:  # reservoirs only needed for the overlays
                 for key in OBS:
                     v = d[key][m]
                     gv = np.isfinite(v)
@@ -342,7 +319,6 @@ def load_pass1(path, color):
     r["tag"] = f"{ee}x{ep}" if ee else f"s{r['s']:.0f}"
     r["label"] = (rf"$e+p$ {ee}$\times${ep} GeV" if ee
                   else rf"$\sqrt{{s}}$ = {np.sqrt(r['s']):.1f} GeV")
-    # bold column header: just the beam energies, e.g. "5 x 41 GeV"
     r["col_title"] = (rf"{ee} $\times$ {ep} GeV" if ee
                       else rf"$\sqrt{{s}}$ = {np.sqrt(r['s']):.1f} GeV")
     r["beam_label"] = (f"$E_e$ = {ee} GeV\n$E_p$ = {ep} GeV" if ee
@@ -370,7 +346,7 @@ def load_pass1(path, color):
 
 def common_bins(key, cut, nbins=100, logx=None):
     if key == "xL":
-        return XL_EDGES          # fixed uniform Delta x_L, not percentiles
+        return XL_EDGES  # fixed uniform Delta x_L, not percentiles
     if logx is None:
         logx = OBS[key][1]
     lo, hi = np.inf, -np.inf
@@ -407,7 +383,7 @@ def build_edge_jobs():
     return jobs
 
 
-# Pass 2 -- exact 1D histograms into the fixed bins from build_edge_jobs()
+# Pass 2
 
 def load_pass2(run, edge_jobs):
     path = run["path"]
@@ -446,7 +422,6 @@ def load_pass2(run, edge_jobs):
 
 RUNS = [load_pass1(f, COLORS[i % len(COLORS)]) for i, f in enumerate(FILES)]
 
-# columns left -> right in order of increasing sqrt(s): 5x41, 10x100, 18x275
 RUNS.sort(key=lambda r: r["s"])
 
 _seen = {}
@@ -456,13 +431,10 @@ for r in RUNS:
     if _seen[r["tag"]] > 1:
         r["tag"] += "_" + os.path.splitext(os.path.basename(r["path"]))[0]
 
-# Cuts that appear on the figure: theta_e', E_e', theta_n, Q2, xB.
 _THETA_E_LINE = (rf"${THETA_E_MIN_DEG:g}^\circ < \theta_{{e'}} < "
                  rf"{THETA_E_MAX_DEG:g}^\circ$" "\n") if APPLY_THETA_E_CUT else ""
 def cut_text(theta_n=None):
-    """Cut list for the annotation box. With no argument the theta_n line
-    lists every config's value, for figures that show more than one.
-    """
+    """Cut list for the annotation box."""
     if theta_n is None:
         vals = " / ".join(f"{CFG_THETA_N_MRAD[k]:g}"
                           for k in ("5x41", "10x100", "18x275")
@@ -477,26 +449,18 @@ def cut_text(theta_n=None):
             rf"$x_B \leq {XB_MAX_PHYS:g}$")
 
 
-CUT_TEXT = cut_text()      # generic, for multi-config figures
+CUT_TEXT = cut_text()  # generic, for multi-config figures
 
 # phase-space lines only (shown on the no-cut row)
 PHASE_TEXT = (rf"$Q^2 \geq {Q2_GEN_MIN:g}$ GeV$^2$" "\n"
               rf"$x_B \leq {XB_MAX_PHYS:g}$")
 
-# NB: \mathcal has no bold glyph in matplotlib's default mathtext font set,
-# so the luminosity symbol is written as a plain (bold) L.
 LUMI_TEXT = rf"$\int L\, \mathrm{{d}}t = {LUMI_FB:g}$ fb$^{{-1}}$"
 
 CBAR_LABEL = (r"$\mathrm{d}^2N/\mathrm{d}x_B\,\mathrm{d}Q^2$ "
               r"[GeV$^{-2}$]")
 CBAR_UNITS = r"[GeV$^{-2}$]"
 
-# How much to write next to each colorbar. The quantity is already in the
-# figure title, so it does not need repeating above every column.
-#   "none"  : no colorbar label at all   (default)
-#   "units" : just [GeV^-2]
-#   "last"  : full expression on the right-hand column only, units elsewhere
-#   "full"  : full expression on every panel
 CBAR_LABEL_MODE = "none"
 
 
@@ -587,7 +551,6 @@ def panel(ax, run, cut, vmin=None, vmax=None, row_label=None,
         draw_y_lines(ax, run["s"])
 
     if row_label:
-        # "No cuts" / "Cuts" as an in-plot legend box, top-right corner
         ax.text(0.97, 0.96, row_label, transform=ax.transAxes,
                 ha="right", va="top", fontsize=15, fontweight="bold",
                 color="black", zorder=9,
@@ -609,8 +572,6 @@ def panel(ax, run, cut, vmin=None, vmax=None, row_label=None,
                 bbox=dict(boxstyle="round", fc="white", ec="black",
                           lw=1.2, alpha=0.92))
 
-
-# the 2 x N figure:  rows = (no cuts, after cuts), cols = beam config
 
 ncol = len(RUNS)
 ROWS = [(False, "No cuts"), (True, "Cuts")]
@@ -636,7 +597,7 @@ for i, (cut, row_name) in enumerate(ROWS):
             axes[0][j].set_title(run["col_title"], fontsize=20,
                                  fontweight="bold", pad=14)
 
-SUPTITLE_UNITS = True    # False -> title is the bare quantity, no [GeV^-2]
+SUPTITLE_UNITS = True
 SUPTITLE = (r"$\mathrm{d}^2N/\mathrm{d}x_B\,\mathrm{d}Q^2$"
             + (r" [GeV$^{-2}$]" if SUPTITLE_UNITS else ""))
 
@@ -660,7 +621,6 @@ fig.savefig(out.replace(".png", ".pdf"))
 plt.close(fig)
 print(f"\n[out] {out}")
 
-# optional: one 1x2 figure per beam config (no cuts / with cuts)
 
 if MAKE_PER_ENERGY_ROW:
     for run in RUNS:

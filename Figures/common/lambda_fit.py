@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""Fit of the pion-flux cutoff Lambda to the two highest x_L bins of H1 and ZEUS.
-
-Uses the chi^2 of Cao et al., PRD 103, 114014 (Eq. 17): the normalizations and the two
-correlated ZEUS systematics are nuisance parameters. Writes lambda_fit_results.csv/.txt,
-lambda_fit_table.tex and chi2_vs_lambda.pdf (Fig. 17).
-"""
+"""Fit of the pion-flux cutoff Lambda to the two highest x_L bins of H1 and ZEUS."""
 
 import csv
 import math
@@ -35,7 +29,6 @@ except Exception:
     import numpy as xp
     GPU = False
 
-# SETTINGS
 HERE = os.path.dirname(os.path.abspath(__file__))
 ZEUS_DAT = os.path.join(HERE, "..", "data", "zeus.dat")
 F2P_TXT = os.path.join(HERE, "..", "data", "F2p_CT18NLO_values.txt")
@@ -44,24 +37,17 @@ OUT_TXT = os.path.join(HERE, "..", "lambda_fit", "lambda_fit_results.txt")
 OUT_CSV = os.path.join(HERE, "..", "lambda_fit", "lambda_fit_results.csv")
 OUT_FIG = os.path.join(HERE, "..", "lambda_fit", "chi2_vs_lambda")
 
-N_XL = 2                                                    # two highest x_L bins, each experiment
-# True: separate nuisance shifts r1, r2 for EACH ZEUS x_L bin (4 parameters: r1, r2 at x_L = 0.85 and 0.94),
-# each acting only on the points of its own bin.  False: one common r1, r2 for both bins.
+N_XL = 2  # two highest x_L bins, each experiment
 ZEUS_R_PER_XL = False
 DNORM_ZEUS = float(os.environ.get("DNORM_LN_ZEUS", 0.088))  # delta n, ZEUS
-DNORM_H1 = float(os.environ.get("DNORM_LN_H1", 0.10))       # delta n, H1
+DNORM_H1 = float(os.environ.get("DNORM_LN_H1", 0.10))  # delta n, H1
 
-# ZEUS NPB 637, 3, Table 1: x_L -> (acceptance unc. [%], energy-scale shift [%]
-# for +2% scale, symmetrised (up-down)/2 with sign).  Same table as
-# PionPDFextraction/extraction_corrected/extract_ln.py::ZEUS_TAB1.
 ZEUS_TAB1 = {0.24: (2.0, -4.5), 0.31: (2.0, -4.5), 0.37: (2.5, -4.5),
              0.43: (3.0, -4.5), 0.49: (3.0, -4.5), 0.55: (3.5, -4.5),
              0.61: (4.0, -4.0), 0.67: (5.0, -4.0), 0.73: (5.0, -2.0),
              0.79: (5.5, 1.5), 0.85: (6.0, 6.5), 0.94: (6.0, 25.5)}
 
 # Lambda values used for JAM21 (JAM18, Table I of the paper)
-# and the Lambda window scanned in the fits (lower edges stay above m_pi where
-# the monopole / Pauli-Villars forms need it).
 FLUX_MODELS = [
     dict(model="s_exp",         lam_jam=1.31, rng=(0.50, 4.00), label=r"$s$-exp"),
     dict(model="t_exp",         lam_jam=0.58, rng=(0.20, 2.50), label=r"$t$-exp"),
@@ -70,8 +56,6 @@ FLUX_MODELS = [
     dict(model="pauli_villars", lam_jam=0.25, rng=(0.15, 1.50), label="Pauli-Villars"),
 ]
 
-# JAM21 LHAPDF set used in the paper (arXiv:2609.03368); this set, not
-# JAM21PionPDFnlo_pT, reproduces the data/theory ratios of Figs. 5 and 7.
 JAM21_SET = "JAM21PionPDFnlo"
 
 PION_SETS = [
@@ -79,32 +63,20 @@ PION_SETS = [
     dict(name="xFitter", lhapdf="xFitterPI_NLO_VAR",  color="crimson",   ls="--"),
     dict(name="GRV",     lhapdf="GRVPI1",             color="darkgreen", ls="-."),
 ]
-# How the central PDF of each set is taken.  JAM21: pset.uncertainty(...).central
-# over all replicas = the MEAN of replicas 1..N.  NOTE member 0 of the JAM21 sets is NOT that mean
-# (differs by 2-20 %), so member 0 must not be used for JAM21.  F2 is linear in
-# the PDFs and every JAM21 replica has the same alpha_s, so F2(mean PDF) is the
-# replica mean of F2.  xFitter / GRV: member 0 (their central member).
 CENTRAL = {"JAM21PionPDFnlo": "replica_mean", "JAM21PionPDFnlo_pT": "replica_mean"}
-# xFitterPI_NLO_VAR: member 0 (its central member).  To use the mean of all its members instead,
-# add  "xFitterPI_NLO_VAR": "replica_mean"  above.
-# replica_mean: replicas sets -> mean of replicas 1..N (member 0 excluded, as LHAPDF's central);
-#               variations sets (xFitter) -> mean of ALL members 0..N.
 MEAN_CACHE = os.path.join(HERE, "..", "cache", "jam21_replica_mean_grids.npz")
 
-N_SCAN = 161          # Lambda grid points per scan
+N_SCAN = 161  # Lambda grid points per scan
 
-# Fit plots (F2^LN vs x_pi, H1 and ZEUS points, one figure per flux model):
-#   "JAM"    -> the H1+ZEUS fit at the JAM Lambda values used in the paper
-#   "common" -> the H1+ZEUS fit with the common best-fit Lambda
 FIT_PLOT_DIR = os.path.join(HERE, "..", "lambda_fit", "fit_plots")
-PLOT_FITS = ("JAM",)              # add "common" for the common best-fit Lambda too
-FIT_PLOT_FLUXES = ("s_exp",)      # which flux models get fit plots
-THEORY_STYLE = dict(color="dimgray", ls="--", lw=2.0)   # unshifted theory curve
+PLOT_FITS = ("JAM",)
+FIT_PLOT_FLUXES = ("s_exp",)  # which flux models get fit plots
+THEORY_STYLE = dict(color="dimgray", ls="--", lw=2.0)  # unshifted theory curve
 ZEUS_MARK = dict(marker="o", color="black", mfc="black", ms=5.0, label_name="ZEUS")
 H1_MARK = dict(marker="s", color="darkorange", mfc="darkorange", ms=5.0, label_name="H1")
 XPI_PLOT = np.logspace(-4.5, np.log10(0.98), 260)
-X_PAD = 3.0          # fit plots: x range = data range padded by this factor
-X_MIN_DECADES = 1.5  # ... but at least this many decades wide
+X_PAD = 3.0
+X_MIN_DECADES = 1.5  # but at least this many decades wide
 
 
 def to_gpu(a):
@@ -129,9 +101,7 @@ GL_WEIGHTS = to_gpu(_GL_W)
 
 
 class GpuPdfGrid:
-    """Tabulate x f(x, Q^2) once on a fixed x grid (CPU, LHAPDF), interpolate on GPU.
-    use_q2=True -> xfxQ2 (H1 machinery), False -> xfxQ (ZEUS machinery).
-    """
+    """Tabulate x f(x, Q^2) once on a fixed x grid (CPU, LHAPDF), interpolate on GPU."""
 
     def __init__(self, pdf, q2val, x_fine, use_q2, arrays=None):
         self.x_fine = to_gpu(x_fine)
@@ -252,8 +222,7 @@ def f2pi_minus_vec_h1(pdf, grid, x_arr_cpu, q2val, bdy_int_arr_cpu):
     return to_cpu(f2)
 
 
-# Sullivan flux, five regulators;
-# only the k_perp^2 ceiling differs: ZEUS (0.65 x_L)^2, H1 0.04 GeV^2
+# Sullivan flux, five regulators
 ALPHA_PI_SLOPE = 1.0
 H1_K2_MAX = 0.04
 
@@ -327,7 +296,7 @@ def load_zeus_top(n_xl=N_XL):
     d = (r / (100.0 * dxl)) * f2p
     alpha = (dr / (100.0 * dxl)) * f2p
     frac = np.array([ZEUS_TAB1[float(v)] for v in x_l]) / 100.0
-    if ZEUS_R_PER_XL:                       # one (r1, r2) pair per x_L bin
+    if ZEUS_R_PER_XL:
         rows, labels = [], []
         for xb in keep:
             mb = np.isclose(x_l, xb)
@@ -336,16 +305,15 @@ def load_zeus_top(n_xl=N_XL):
                 b[mb] = frac[mb, k] * d[mb]
                 rows.append(b)
                 labels.append((float(xb), k))
-        beta = np.array(rows)                                     # (4, N)
-    else:                                   # one common (r1, r2)
-        beta = (frac * d[:, None]).T                              # (2, N)
+        beta = np.array(rows)  # (4, N)
+    else:  # one common (r1, r2)
+        beta = (frac * d[:, None]).T  # (2, N)
         labels = [(None, 0), (None, 1)]
     return dict(expt="ZEUS", x_l=x_l, q2=q2, x_pi=x / (1.0 - x_l), d=d, alpha=alpha,
                 beta=beta, r_labels=labels, xl_bins=keep, dnorm=DNORM_ZEUS)
 
 
 def zeus_r_by_bin(ev, Z):
-    """{x_L: (r1, r2)} for every fitted ZEUS bin (the same pair in every bin if ZEUS_R_PER_XL is False)."""
     out = {}
     for xb in Z["xl_bins"]:
         r1 = r2 = 0.0
@@ -379,12 +347,11 @@ def load_h1_top(n_xl=N_XL):
 
 _PDF_CACHE = {}
 _BDY_PLOT = None
-_MEAN = None          # replica-mean grids, key "set|q2|xQ2" -> (11, n_x) array
+_MEAN = None
 _MEMBERS = {}
 
 
 def get_pdf(set_name):
-    """Member 0 -- used for alpha_s(Q) always, and as the PDF for member-0 sets."""
     if set_name not in _PDF_CACHE:
         _PDF_CACHE[set_name] = lhapdf.mkPDF(set_name, 0)
     return _PDF_CACHE[set_name]
@@ -463,7 +430,7 @@ class JamChi2:
         self.dn = data["dnorm"]
         C = np.diag(self.alpha ** 2) + self.beta.T @ self.beta
         L = np.linalg.cholesky(C)
-        self.W = np.linalg.solve(L, np.eye(len(L)))       # W^T W = C^-1
+        self.W = np.linalg.solve(L, np.eye(len(L)))  # W^T W = C^-1
         self.Wd = self.W @ self.d
         self.A = self.beta / self.alpha
         self.K = self.beta.shape[0]
@@ -528,7 +495,6 @@ def per_bin(ev, data):
     return {xl: float(np.sum(ev["resid"][data["x_l"] == xl] ** 2)) for xl in data["xl_bins"]}
 
 
-# Fit plot: F2^LN vs x_pi, ZEUS block (top) and H1 block (bottom)
 def _odd_decade_fmt(v, pos):
     if v <= 0:
         return ""
@@ -563,20 +529,11 @@ def decade_fmt_inside(lo, hi, edge=0.12):
 
 
 def zeus_scale(r, xl):
-    """s = 1 - r1 f1(x_L) - r2 f2(x_L): the factor the ZEUS correlated shift
-    puts on the data in x_L bin xl (beta_k,i = f_k(x_L) d_i).
-    """
     f1, f2 = np.array(ZEUS_TAB1[float(xl)]) / 100.0
     return 1.0 - r[0] * f1 - r[1] * f2
 
 
 def make_fit_figure(path_base, fm, Z, H, curves, entries, header):
-    """entries: list of dict(name, color, ls, lam, evz, evh) -- one per pion PDF.
-    curves[(pdf_name, expt, q2)] = F2^pi on XPI_PLOT.
-    Solid curve  = 2 f F2^pi / (n_e s_xL)  -- the theory the data are fitted to
-                   (s_xL = ZEUS correlated shift, 1 for H1).
-    Dotted curve = 2 f F2^pi                -- raw, no n_e, no shift.
-    """
     from matplotlib.ticker import FuncFormatter, LogLocator, MaxNLocator, NullFormatter
     from matplotlib.lines import Line2D
 
@@ -698,20 +655,14 @@ def make_fit_figure(path_base, fm, Z, H, curves, entries, header):
     plt.close(fig)
 
 
-# chi^2(Lambda) figure: H1+ZEUS only, paper (Ivan) panel style + header box
 CHI2_PDF_STYLE = {"JAM21": ("#0a7cff", "-", 0.0), "xFitter": ("crimson", "--", 0.0),
-                  "GRV": ("forestgreen", ":", 1.4)}          # colour, ls, extra lw (per.py)
+                  "GRV": ("forestgreen", ":", 1.4)}  # colour, ls, extra lw
 CHI2_FLUX_TITLE = {"s_exp": r"$s$-exp", "t_exp": r"$t$-exp", "monopole": "monopole",
                    "regge": "Regge", "pauli_villars": "Pauli-Villars"}
 
 
 def make_chi2_figure(fitC, fixedC, Z, H):
-    """chi^2/N (H1+ZEUS) vs Lambda, one panel per flux, no gaps, no header.
-    JAM21: profiled chi^2/N curve, star = its Table 1 Lambda (JAM's own value).
-    xFitter, GRV: profiled chi^2/N curves, best fit marked.  Lambda values written in each panel.
-    Uniform x ticks (4-step frame, ticks at 1/4, 1/2, 3/4); the tightest y range (from 6 up) on which
-    every Lambda label can be placed without touching a curve, marker, the legend or the frame.
-    """
+    """chi^2/N (H1+ZEUS) vs Lambda, one panel per flux, no gaps, no header."""
     from matplotlib.ticker import FuncFormatter, AutoMinorLocator
     from matplotlib.lines import Line2D
 
@@ -774,7 +725,7 @@ def make_chi2_figure(fitC, fixedC, Z, H):
 
     FRAMES = windows()
 
-    YLO = -1.0                                   # y axis starts a little below zero (room for the Lambda row)
+    YLO = -1.0
 
     def build(YMAX):
         fig = plt.figure(figsize=(fw, fh))
@@ -795,7 +746,7 @@ def make_chi2_figure(fitC, fixedC, Z, H):
             ax.set_xlim(xlo, xlo + 4.0 * step)
             ax.set_xticks([xlo + step, xlo + 2.0 * step, xlo + 3.0 * step])
             ax.set_ylim(YLO, YMAX)
-            ax.set_yticks(list(np.arange(0.0, YMAX, 1.0)))   # ends dropped (panels touch)
+            ax.set_yticks(list(np.arange(0.0, YMAX, 1.0)))  # ends dropped (panels touch)
             ax.xaxis.set_minor_locator(AutoMinorLocator(5))
             ax.yaxis.set_minor_locator(AutoMinorLocator())
             ax.xaxis.set_major_formatter(FuncFormatter(bold_2f))
@@ -836,7 +787,7 @@ def make_chi2_figure(fitC, fixedC, Z, H):
                     return "touches the legend"
                 for ln in ax.lines:
                     xy = ln.get_xydata()
-                    if len(xy) == 1:                          # marker
+                    if len(xy) == 1:  # marker
                         px = ax.transData.transform(xy)[0]
                         r = ln.get_markersize() * fig.dpi / 72.0 * 0.6
                         if tb.x0 - r < px[0] < tb.x1 + r and tb.y0 - r < px[1] < tb.y1 + r:
@@ -854,7 +805,6 @@ def make_chi2_figure(fitC, fixedC, Z, H):
         from matplotlib.offsetbox import AnchoredOffsetbox, HPacker, TextArea
 
         def lam_row(ax, fm):
-            """One row at the bottom middle:  Lambda = a, b, c  (JAM21 Table 1, xFitter, GRV), values in colour."""
             vals = [("JAM21", f"{fm['lam_jam']:.2f}")] + \
                    [(p["name"], f"{fitC[(p['name'], fm['model'])]['lam']:.2f}") for p in FITTED]
             prop = dict(fontsize=12.5, fontweight="bold")
@@ -863,7 +813,6 @@ def make_chi2_figure(fitC, fixedC, Z, H):
                 nums.append(TextArea(v, textprops=dict(color=CHI2_PDF_STYLE[nm][0], **prop)))
                 if k < len(vals) - 1:
                     nums.append(TextArea(",", textprops=dict(color="black", **prop)))
-            # comma glued to the number before it, one space after it
             groups, k = [], 0
             while k < len(nums):
                 grp = [nums[k]] + ([nums[k + 1]] if k + 1 < len(nums) else [])
@@ -878,7 +827,6 @@ def make_chi2_figure(fitC, fixedC, Z, H):
             return box
 
         bad = []
-        # the legend must not hide any curve or marker of the first panel
         for ln in axes[0].lines:
             xy = ln.get_xydata()
             n = max(1, 20 * len(xy))
@@ -991,7 +939,7 @@ def make_tex_table(fitC, fixedC, Z, H):
         if r.returncode != 0:
             print(r.stdout[-2000:])
             raise RuntimeError("pdflatex failed")
-        try:                                                # crop the page to the table
+        try:  # crop the page to the table
             import fitz
             doc = fitz.open(os.path.join(tmp, "lambda_fit_table.pdf"))
             pg = doc[0]

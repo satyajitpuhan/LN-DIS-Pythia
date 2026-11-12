@@ -1,13 +1,6 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""ZEUS part of Fig. 9: three pion PDFs times five Pythia settings.
+"""ZEUS part of Fig. 9: three pion PDFs times five Pythia settings."""
 
-The physics and plotting code is taken from zeus_three_pions.py; the Pythia part
-comes from hists/ZEUS_*.npz. --mode previous / new as in h1_sullivan.py.
-"""
-
-
-# from zeus_three_pions.py: imports, style, constants, cuts, binning
 
 import argparse, os, sys, ctypes, warnings
 PYTHIA_OUT = os.environ.get("PYTHIA_OUT", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Pythia", "output"))
@@ -23,26 +16,20 @@ from scipy.integrate import quad, IntegrationWarning
 
 warnings.filterwarnings("ignore", category=IntegrationWarning)
 
-# Standalone: ZEUS binning, pion physics, Pythia/ZEUS loaders, rcParams and
-# grid helpers are all defined below, as in zeus_five_settings.py.
 
-# FONT SIZES / WEIGHTS -- same house style as zeus_five_settings.py, so
-# the ZEUS three-pion-PDF grids come out visually identical to the
-# five-PDF-set "DIS background" grids (bold serif, heavy panel boxes,
-# large tick/axis labels, thick data markers).
-FS_AXLABEL = 42     # F_2^LN(...) and x_L axis labels
-FS_TITLE   = 28     # Q^2 column titles
-FS_ROWLAB  = 26     # x_B row labels
-FS_TICK    = 24     # x and y tick numbers
-FS_LEGEND  = 24     # the one shared corner legend
+FS_AXLABEL = 42  # F_2^LN(...) and x_L axis labels
+FS_TITLE   = 28  # Q^2 column titles
+FS_ROWLAB  = 26  # x_B row labels
+FS_TICK    = 24  # x and y tick numbers
+FS_LEGEND  = 24  # the one shared corner legend
 
-SPINE_LW  = 3.2     # panel box -- deliberately heavy
-LW_BKG    = 2.6     # CT18NLO+Remnant DIS-background histogram
-LW_PION   = 3.2     # raw pion-PDF histograms (JAM21 / xFitter / GRV)
-LW_SUM    = 3.2     # CT18NLO+Remnant + pion sums
-DATA_MS   = 7.0     # ZEUS marker size
+SPINE_LW  = 3.2  # panel box
+LW_BKG    = 2.6  # CT18NLO+Remnant DIS-background histogram
+LW_PION   = 3.2
+LW_SUM    = 3.2  # CT18NLO+Remnant + pion sums
+DATA_MS   = 7.0  # ZEUS marker size
 DATA_MEW  = 1.5
-DATA_ELW  = 2.0     # error-bar line width
+DATA_ELW  = 2.0  # error-bar line width
 DATA_CAPS = 3.5
 
 matplotlib.rcParams.update({
@@ -50,7 +37,7 @@ matplotlib.rcParams.update({
     "font.serif"         : ["Times New Roman", "DejaVu Serif"],
     "font.weight"        : "bold",
     "mathtext.fontset"   : "dejavuserif",
-    "mathtext.default"   : "bfit",     # bold *italic* math (H1 style)
+    "mathtext.default"   : "bfit",  # bold *italic* math (H1 style)
     "axes.labelsize"     : FS_ROWLAB,
     "axes.labelweight"   : "bold",
     "axes.titlesize"     : FS_TITLE,
@@ -71,12 +58,11 @@ matplotlib.rcParams.update({
     "legend.edgecolor"   : "0.45",
     "legend.fontsize"    : FS_LEGEND,
     "figure.dpi"         : 150,
-    "axes.linewidth"     : SPINE_LW,     # bold panel boundaries
+    "axes.linewidth"     : SPINE_LW,  # bold panel boundaries
 })
 
-# CONSTANTS
-N_TOTAL    = 500_000_000       # N_generated: 5x10^8 events
-CHUNK_SIZE = 2_000_000         # tree entries streamed per chunk
+N_TOTAL    = 500_000_000  # N_generated: 5x10^8 events
+CHUNK_SIZE = 2_000_000  # tree entries streamed per chunk
 
 C_MC   = "#1f77b4"
 C_DATA = "black"
@@ -86,9 +72,6 @@ TICK_LABEL_STROKE = 0.6
 
 
 def _stroke(*artists, width=TICK_LABEL_STROKE):
-    """Make text noticeably heavier at the SAME font size by stroking the
-    glyph outlines.
-    """
     if width <= 0:
         return
     fx = [patheffects.withStroke(linewidth=width, foreground="black")]
@@ -104,8 +87,6 @@ def bold_ticklabels(ax, width=TICK_LABEL_STROKE):
         _stroke(t, width=width)
 
 
-# ---- Pythia ROOT files (used only to look up the CT18NLO+Remnant default
-# path in main()) --------------------------------------------------------
 PYTHIA_FILES = [
     dict(path=os.path.join(PYTHIA_OUT, "zeus_default.root"),
          label="Pythia default", color="#1f77b4"),
@@ -122,14 +103,13 @@ PYTHIA_FILES = [
 ALPHA      = 1.0 / 137.036
 GEV2_TO_NB = 0.3893793656e6
 E_E        = 27.5
-E_P        = 820.0             # ZEUS 1995-97 running, NOT HERA-II 920
-S          = 4.0 * E_E * E_P   # 90 200 GeV^2
+E_P        = 820.0
+S          = 4.0 * E_E * E_P  # 90 200 GeV^2
 
 # ZEUS cuts
 EePrime_MIN  = 10.0
 THETA_N_MAX  = 0.8e-3
 PT_COEFF     = 0.656
-# NOTE: explicitly NO y cut, NO W^2 cut, NO electron-angle cut.
 
 # x_L binning (ZEUS, 12 bins)
 XL_EDGES = np.array([0.20, 0.28, 0.34, 0.40, 0.46, 0.52, 0.58,
@@ -137,13 +117,9 @@ XL_EDGES = np.array([0.20, 0.28, 0.34, 0.40, 0.46, 0.52, 0.58,
 XL_CTRS  = 0.5 * (XL_EDGES[:-1] + XL_EDGES[1:])
 XL_XERR  = 0.5 * (XL_EDGES[1:]  - XL_EDGES[:-1])
 XL_BWS   = XL_EDGES[1:] - XL_EDGES[:-1]
-N_XL     = len(XL_CTRS)        # 12
+N_XL     = len(XL_CTRS)
 
 # ZEUS Q^2 bins (7 columns)
-# The former 8th column, Q^2 in [640, 1280] (nominal 960, tabulated in
-# zeus.dat under Q2=1000), has been dropped on request - the grid is now
-# 7 x 7. Per-panel ("subplot") size is unchanged: the figure width scales
-# with NQ_ZEUS, so each panel keeps the same dimensions as before.
 Q2_BINS_ZEUS = [
     (7.0,    4.0,    10.0),
     (15.0,   10.0,   20.0),
@@ -154,8 +130,6 @@ Q2_BINS_ZEUS = [
     (480.0,  320.0,  640.0),
 ]
 
-# No Q^2 column needs a non-nominal zeus.dat key any more (the [640,1280]
-# column that was tabulated under Q2=1000 has been removed).
 Q2_ZEUS_DAT_KEY = {}
 
 # ZEUS x_BJ bins (7 rows)
@@ -169,16 +143,10 @@ X_BINS_ZEUS = [
     (32.e-3, 1.0e-2, 1.0e-1),
 ]
 
-NQ_ZEUS = len(Q2_BINS_ZEUS)     # 7
-NX_ZEUS = len(X_BINS_ZEUS)      # 7
+NQ_ZEUS = len(Q2_BINS_ZEUS)
+NX_ZEUS = len(X_BINS_ZEUS)
 
 
-# from zeus_three_pions.py: NLO F2^pi (quad), s-exp flux, pion grid
-
-
-# JAM21-style pion-PDF NLO F2^pi + leading-neutron flux
-# (works for any LHAPDF pion set; load_pion_hists_zeus() calls this for
-# JAM21, xFitter and GRV)
 LOCAL_LHAPDF_ROOT = "/home/aries/local"
 LOCAL_LHAPDF_SITE = f"{LOCAL_LHAPDF_ROOT}/lib/python3.10/dist-packages"
 LOCAL_LHAPDF_LIB  = f"{LOCAL_LHAPDF_ROOT}/lib/libLHAPDF.so"
@@ -322,11 +290,7 @@ def flux(x_l_val):
 
 
 def compute_all_jam21_f2ln_zeus(pdf):
-    """Full 7(x) x 8(Q2) rectangular grid. F_2LN(x_L) = 2*f_{pi/N}(x_L)*F_2^pi(x_pi,Q2),
-    with x_pi = x_BJ / (1 - x_L). Pion-PDF-agnostic: called for each of
-    JAM21 / xFitter / GRV in load_pion_hists_zeus().
-    Returns dict (iq, ix) -> f2ln array[N_XL] (NaN where x_pi >= 1).
-    """
+    """Full 7(x) x 8(Q2) rectangular grid."""
     f2ln_jam = {}
     for iq, (q2_nom, q2lo, q2hi) in enumerate(Q2_BINS_ZEUS):
         for ix, (x_nom, xlo, xhi) in enumerate(X_BINS_ZEUS):
@@ -342,11 +306,9 @@ def compute_all_jam21_f2ln_zeus(pdf):
     return f2ln_jam
 
 
-# from zeus_three_pions.py: F2p table, helpers, F_2^LN conversion
-
 def load_f2p_table(filename=F2P_TABLE_FILE):
     table = np.loadtxt(filename)
-    return table[:, 0], table[:, 1], table[:, 2]   # x, Q2, F2p(CT18NLO)
+    return table[:, 0], table[:, 1], table[:, 2]  # x, Q2, F2p(CT18NLO)
 
 
 def match_f2p(x_query, q2_query, x_table, q2_table, f2p_table):
@@ -406,12 +368,7 @@ def dsig_to_f2ln(dsig_per_xl, x, Q2, dx, dQ2):
     return np.asarray(dsig_per_xl, dtype=float) / denom
 
 
-# from zeus_three_pions.py: Pythia F_2^LN, ZEUS data
-
 def compute_all_pythia_f2ln_zeus(data):
-    """For every cell of the FULL 7(x) x 8(Q2) grid, compute F_2LN from
-    Pythia dsigma/dx_L. Returns dict (iq, ix) -> (f2ln array[N_XL], n_events).
-    """
     sigma_dis = data["sigma_dis"]
     counts    = data["counts"]
 
@@ -434,12 +391,7 @@ def compute_all_pythia_f2ln_zeus(data):
     return f2ln_py, nevts
 
 
-# ZEUS DATA (zeus.dat)
 def load_zeus_f2ln(path, f2p_table_file=F2P_TABLE_FILE):
-    """zeus.dat columns:
-    0: xL bin index   1: xL centre   2: Q2   3: x_BJ
-    4: R_LN (%)       5: dR_LN (%)   6: F2p_ref (model A)  7: F2p_ref (model B)
-    """
     raw = np.loadtxt(path)
     x_l  = raw[:, 1]
     q2   = raw[:, 2]
@@ -462,9 +414,6 @@ def load_zeus_f2ln(path, f2p_table_file=F2P_TABLE_FILE):
         for ix, (x_nom, _, _) in enumerate(X_BINS_ZEUS):
             lut[(round(q2_key, 6), round(x_nom, 8))] = (iq, ix)
 
-    # The Q^2 in [640, 1280] column (tabulated in zeus.dat under Q2=1000)
-    # has been dropped from the grid - skip its rows quietly rather than
-    # emitting an "unmatched point" warning for every one of them.
     _DROPPED_Q2_DAT_KEYS = {1000.0}
 
     data = {}
@@ -493,12 +442,8 @@ def load_zeus_f2ln(path, f2p_table_file=F2P_TABLE_FILE):
     return out
 
 
-# from zeus_three_pions.py: chi^2 table, pion PDF sets, pion histograms
-
 def save_chi2_table(results, out_path, title=""):
-    """Write an overall chi^2 summary (one row per PDF-set curve) to a
-    plain-text file.
-    """
+    """Write an overall chi^2 summary (one row per PDF-set curve) to a plain-text file."""
     with open(out_path, "w") as f:
         if title:
             f.write(f"{title}\n")
@@ -512,36 +457,26 @@ def save_chi2_table(results, out_path, title=""):
     print(f"  -> {out_path}")
 
 
-# -- proton PDF used here: CT18NLO + Remnant (grey dashed background) --
 CT18RE_LABEL = "CT18NLO + Remnant"
 C_CT18RE_BKG = "purple"
 
 
 def _pythia_label(label):
-    """'CT18NLO+Remnant' -> 'Pythia (CT18NLO+Remnant)', but leave names
-    that already say Pythia alone -- identical convention to zeus_five_settings.py's
-    _pythia_label(), so the two scripts' legends read the same way.
-    """
     return label if label.strip().lower().startswith("pythia") else f"Pythia ({label})"
 
-# -- the three pion PDFs (key, LHAPDF-set-name, display label, colour) --
 PION_PDF_SETS = [
     ("jam21",   "JAM21PionPDFnlo", "JAM21",   "#0a7cff"),
-    ("xfitter", "xFitterPI_NLO_VAR",  "xFitter", "#d62728"),  # red (no canonical analogue)
-    ("grv",     "GRVPI1",             "GRV",     "#2ca02c"),  # green (no canonical analogue)
+    ("xfitter", "xFitterPI_NLO_VAR",  "xFitter", "#d62728"),
+    ("grv",     "GRVPI1",             "GRV",     "#2ca02c"),
 ]
 
 
 def _xl_tick_fmt(v, pos):
-    """Bold x_L tick labels: 0.50, 0.75, 1 -- whole numbers lose the
-    trailing '.00' (H1/ZEUS style). Matches zeus_five_settings.py's tick pattern.
-    """
     if abs(v - round(v)) < 1e-9:
         return rf"$\mathbf{{{int(round(v))}}}$"
     return rf"$\mathbf{{{v:.2f}}}$"
 
 
-# Load the three pion PDFs and compute each F_2^{LN} on the ZEUS grid
 def load_pion_hists_zeus(pion_pdf_sets):
     import lhapdf
     hists = {}
@@ -552,38 +487,24 @@ def load_pion_hists_zeus(pion_pdf_sets):
         except Exception as e:
             print(f"  WARNING: could not load {pdfname}: {e}  — skipped")
             continue
-        # compute_all_jam21_f2ln_zeus is pion-PDF-agnostic: it takes any pion
-        # PDF object and returns the (iq, ix) -> F_2^{LN} array dict.
         hists[key] = compute_all_jam21_f2ln_zeus(pdf_obj)
         print(f"  → F_2LN computed on the ZEUS grid for '{label}'")
     return hists
 
 
-# from zeus_three_pions.py: cell averages, chi^2, publication overview grid
-
-# ONE colour scheme, reused identically in every panel (deliberately NOT
-# coloured per Pythia set -- the columns are distinguished by their
-# headings, not by hue). Line styles differ too, so the figure survives
-# greyscale printing.
-C_DIS   = "#1f77b4"   # DIS fragmentation  (Pythia proton PDF)
-C_PDFAV = "#2ca02c"   # PDF average        (pion PDF)
-C_TOTAL = "#d62728"   # Total = DIS + PDF
+C_DIS   = "#1f77b4"  # DIS fragmentation  (Pythia proton PDF)
+C_PDFAV = "#2ca02c"  # PDF average        (pion PDF)
+C_TOTAL = "#d62728"
 
 LS_DIS, LS_PDFAV, LS_TOTAL = "--", "-.", "-"
 
-# The 7x7 grids can afford FS_TITLE=28, but five long column headings
-# ("CT18NLO + Remnant" ...) collide at that size, so this grid uses its own.
 FS_TITLE_OV = 22
 
-# The chi^2/N box is an annotation, not a heading -- at FS_LEGEND (24) it
-# dominates the panel and crowds the curves, so it gets its own size.
 FS_CHI2_OV = 15
 
 OVERVIEW_YLIM   = (0.0, 0.25)
-OVERVIEW_XTICKS = [0.4, 0.6, 0.8]        # interior ticks only: with
-OVERVIEW_YTICKS = [0.05, 0.10, 0.15, 0.20]  # wspace=hspace=0 the panels
-                                            # touch, so edge ticks would
-                                            # collide with the neighbour.
+OVERVIEW_XTICKS = [0.4, 0.6, 0.8]
+OVERVIEW_YTICKS = [0.05, 0.10, 0.15, 0.20]
 
 
 def _ov_tick_fmt(v, pos):
@@ -594,11 +515,6 @@ def _ov_tick_fmt(v, pos):
 
 
 def _average_pair_over_cells(py_dict, pion_dict, zeus_data):
-    """Cell-average the Pythia (DIS fragmentation) and pion (PDF average)
-    F_2^LN histograms over every (Q^2, x_BJ) cell that carries a ZEUS
-    measurement, counting -- in each x_L bin independently -- only the
-    cells where BOTH curves are finite.
-    """
     s_dis = np.zeros(N_XL)
     s_pdf = np.zeros(N_XL)
     n_cnt = np.zeros(N_XL)
@@ -624,10 +540,6 @@ def _average_pair_over_cells(py_dict, pion_dict, zeus_data):
 
 
 def _average_zeus_overview(zeus_data):
-    """Inverse-variance-weighted average of every ZEUS point, rebinned
-    onto XL_EDGES, collapsing the whole (Q^2, x_BJ) grid onto a single
-    representative x_L curve.
-    """
     sum_wf = np.zeros(N_XL)
     sum_w  = np.zeros(N_XL)
     for xl_d, f2_d, e_d in zeus_data.values():
@@ -646,9 +558,6 @@ def _average_zeus_overview(zeus_data):
 
 
 def _chi2_total_over_cells(py_dict, pion_dict, zeus_data):
-    """Overall chi^2 and N of the ZEUS points against the per-cell Total
-    (Pythia + pion), accumulated over the whole grid.
-    """
     chi2 = 0.0
     ndof = 0
     for cell, (xl_d, f2_d, e_d) in zeus_data.items():
@@ -674,7 +583,7 @@ def _chi2_total_over_cells(py_dict, pion_dict, zeus_data):
 def make_publication_overview_grid(pythia_dict, pion_hists, zeus_data, out,
                                    pion_pdf_sets=PION_PDF_SETS):
     """Publication grid: pion PDFs (rows) x Pythia proton PDFs (columns)."""
-    # Enforce H1-matching column order
+    # same column order as H1
     desired_order = [
         "Pythia default",
         "CT18NLO",
@@ -692,16 +601,12 @@ def make_publication_overview_grid(pythia_dict, pion_hists, zeus_data, out,
     zeus_avg, zeus_err = _average_zeus_overview(zeus_data)
     zvalid = np.isfinite(zeus_avg) & np.isfinite(zeus_err)
 
-    # Panels touch edge-to-edge (H1/ZEUS staircase convention). Panel size
-    # matches the 7x7 grids, so the shared FS_* sizes stay consistent.
     fig, axes = plt.subplots(
         n_pion, n_py,
         figsize=(n_py * 4.8, n_pion * 4.0),
         gridspec_kw=dict(wspace=0.0, hspace=0.0),
         sharex=True, sharey=True, squeeze=False)
     fig.patch.set_facecolor("white")
-    # Default subplot margins leave ~12% blank above the titles, which
-    # would open a dead gap under the shared legend.
     fig.subplots_adjust(left=0.085, right=0.985, top=0.935, bottom=0.075,
                         wspace=0.0, hspace=0.0)
 
@@ -742,7 +647,6 @@ def make_publication_overview_grid(pythia_dict, pion_hists, zeus_data, out,
             if legend_src is None and pion_dict is not None:
                 legend_src = ax
 
-            # the ONLY per-panel annotation: chi^2/N
             if ndof > 0:
                 ax.text(0.965, 0.955, rf"$\chi^2/N = {chi2 / ndof:.2f}$",
                         transform=ax.transAxes, ha="right", va="top",
@@ -781,7 +685,6 @@ def make_publication_overview_grid(pythia_dict, pion_hists, zeus_data, out,
                             ha="center", va="center", rotation=90,
                             fontsize=FS_ROWLAB, fontweight="bold"))
 
-    # ---- ONE shared legend, above the grid (never repeated per panel) --
     if legend_src is not None:
         handles, labels = legend_src.get_legend_handles_labels()
         seen, h2, l2 = set(), [], []
@@ -816,8 +719,6 @@ def make_publication_overview_grid(pythia_dict, pion_hists, zeus_data, out,
         uy0 = min(p.y0 for p in pos) - 0.03
 
     pad = 0.012
-    # Same font size, stroked so the glyphs render heavier (mathtext has
-    # no weight above bold) -- identical trick to the 7x7 grids.
     _lbl_stroke = [patheffects.withStroke(linewidth=AXIS_LABEL_STROKE,
                                           foreground="black")]
 
@@ -825,8 +726,6 @@ def make_publication_overview_grid(pythia_dict, pion_hists, zeus_data, out,
                    fontsize=FS_AXLABEL, fontweight="bold")
     t_x.set_path_effects(_lbl_stroke)
 
-    # The row headings (JAM21 / xFitter / GRV) live in the left margin, so
-    # anchor the universal y label outside THEM, not merely outside the axes.
     y_anchor = ux0
     try:
         inv = fig.transFigure.inverted()
@@ -849,11 +748,10 @@ def make_publication_overview_grid(pythia_dict, pion_hists, zeus_data, out,
     plt.close(fig)
 
 
-# Revised analysis: Pythia from the count histograms, new pion inputs
 import csv as _csv
 
 HERE_ = os.path.dirname(os.path.abspath(__file__))
-import lambda_fit as _ZLF                      # noqa: E402
+import lambda_fit as _ZLF
 
 HIST_DIR = os.path.join(HERE_, "..", "inputs", "pythia_histograms")
 ZEUS_DAT_PATH = os.path.join(HERE_, "..", "data", "zeus.dat")
@@ -862,14 +760,12 @@ FIT_CSV = os.path.join(HERE_, "..", "lambda_fit", "lambda_fit_results.csv")
 ZEUS_HISTS = [("default", "Pythia default"), ("ct18", "CT18NLO"), ("ct18re", "CT18NLO + Remnant"),
               ("ct18tune", "CT18NLO + Tuning"), ("ct18gluon", "CT18NLO + Gluon")]
 JAM21_TABLE1_LAMBDA = 1.31
-# chi^2/N printed in the original figure ZEUS/compare_f2ln_zeus_ctre_three_all_combinations_overview.png
 ORIGINAL_CHI2N = {"jam21": [13.01, 15.73, 8.57, 31.78, 16.40],
                   "xfitter": [15.44, 17.18, 17.01, 18.86, 17.50],
                   "grv": [16.64, 19.75, 10.46, 35.89, 20.50]}
 
 
 def pythia_data_from_hist(npz_path):
-    """dict(sigma_dis, counts) exactly as zeus_three_pions.py's load_pythia() returns it."""
     z = np.load(npz_path)
     assert np.allclose(z["xl_edges"], XL_EDGES), "x_L binning differs from zeus_three_pions.py"
     print(f"  {os.path.basename(npz_path)}: sigma = {float(z['sigma_dis']):.4f} nb, "
@@ -878,7 +774,6 @@ def pythia_data_from_hist(npz_path):
 
 
 def make_flux(lam):
-    """zeus_three_pions.py's flux() with the cutoff Lambda as a parameter (identical integrand, kmax = 0.65 x_L)."""
     @lru_cache(maxsize=None)
     def f(x_l_val):
         def integrand(k2):
@@ -898,9 +793,6 @@ def make_flux(lam):
 
 
 class MeanPDF:
-    """Stand-in pion PDF for zeus_three_pions.py's f2_nlo: alpha_s from member 0 (identical in every
-    JAM21 replica); x f(x) = replica MEAN, put straight into the PDF_CACHE of zeus_three_pions.py on its X_FINE.
-    """
     def __init__(self, set_name):
         self.set_name = set_name
         self._m0 = lhapdf.mkPDF(set_name, 0)
@@ -941,9 +833,6 @@ def best_lambdas():
     return out
 
 
-# zeus_three_pions.py keys PDF_CACHE by id(pdf). Once a PDF object is freed, Python may give the
-# next PDF the same id and the cached grid of the OLD PDF would be reused. So the
-# cache is emptied before every pion PDF and every PDF object is kept alive.
 _ALIVE = []
 
 

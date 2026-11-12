@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Helpers for data_over_theory.py: data loaders, F2^pi curves with PDF bands
 and the shift factors from the Lambda fit. Run on its own it draws test versions of
 Figs. 2 and 4-7 into ratio_tools/.
@@ -28,7 +27,6 @@ CURVE_CACHE = os.path.join(HERE, "..", "cache", "f2pi_member_curves.npz")
 XPI_GRID = np.logspace(-4, np.log10(1.0 - 1e-6), 120)
 PAPER_LAMBDA = {fm["model"]: fm["lam_jam"] for fm in M.FLUX_MODELS}
 
-# label, LHAPDF set, colour, linestyle, has_band (colours as in the paper)
 PDF_SPECS = [
     ("JAM21",   M.JAM21_SET,          "#0a7cff",     "-",  True),
     ("xFitter", "xFitterPI_NLO_VAR",  "crimson",     "--", True),
@@ -47,8 +45,8 @@ FLUX_STYLE = {  # colour, linestyle, label
 PANEL_IN, MARG_L, MARG_R, MARG_B, MARG_T = 2.7, 1.95, 0.18, 1.15, 0.65
 FS_AXLABEL, FS_TITLE, FS_ROWLAB, FS_LEGEND = 26, 23, 23, 12
 
-ZEUS_REMOVE_XL = [0.24, 0.31, 0.43, 0.67, 0.79]   # rows of Fig. 6
-ZEUS_DROP_Q2 = [1000.0]                            # Fig. 6 columns
+ZEUS_REMOVE_XL = [0.24, 0.31, 0.43, 0.67, 0.79]  # rows of Fig. 6
+ZEUS_DROP_Q2 = [1000.0]  # Fig. 6 columns
 
 plt.rcParams.update({
     "font.family": "serif", "font.serif": ["Times New Roman", "DejaVu Serif"],
@@ -85,7 +83,7 @@ def shift_table(tag):
             if r["fit"] != want:
                 continue
             rb = {}
-            if r.get("r1") not in (None, ""):                 # common r1, r2 -> every x_L bin
+            if r.get("r1") not in (None, ""):  # common r1, r2 -> every x_L bin
                 rb["common"] = (float(r["r1"]), float(r["r2"]))
             for key, val in r.items():
                 if key.startswith("r1_xL") and val not in ("", None):
@@ -96,9 +94,7 @@ def shift_table(tag):
 
 
 def shift_factor(shifts, pdf, flux_model, expt, xl):
-    """Shifted theory = raw theory x this:  1/(n_e s).  ZEUS: s = 1 - r1(x_L) b1(x_L) - r2(x_L) b2(x_L)
-    in the fitted x_L bins (r_k fitted per bin), s = 1 in the other bins.  H1: s = 1.
-    """
+    """Shifted theory = raw theory x this:  1/(n_e s)."""
     sh = shifts[(pdf, flux_model)]
     if expt == "H1":
         return 1.0 / sh["nH"]
@@ -119,7 +115,6 @@ def lambda_table(tag):
     return best_lambdas()
 
 
-# data (all x_L)
 def h1_all():
     rows = []
     with open(M.H1_DAT) as fh:
@@ -145,7 +140,6 @@ def zeus_all():
                 d=((r / (100.0 * dxl)) * f2p)[m], err=((dr / (100.0 * dxl)) * f2p)[m])
 
 
-# F2^pi for every member on XPI_GRID (cached), then central / band
 _BDY = None
 _CACHE = None
 
@@ -229,7 +223,7 @@ def _ratio_fmt(v, pos):
     return rf"$\mathbf{{{v:.1f}}}$"
 
 
-# Fig. 2 -- flux
+# Fig. 2
 def fig2_flux(lam_of, tag):
     cuts = [(r"H1:  $P_T \leq 0.2$ GeV", lambda xL: 0.04),
             (r"ZEUS:  $P_T \leq 0.656\,x_L$ GeV", lambda xL: (0.656 * xL) ** 2)]
@@ -270,7 +264,7 @@ def fig2_flux(lam_of, tag):
     _save(fig, f"fig2_flux_{tag}")
 
 
-# Figs. 4 / 6 -- F2^LN grids (s-exp, three pion PDFs, bands)
+# Figs. 4 / 6
 def fig_grid(D, lam_of_pdf, shifts, outname):
     expt = D["expt"]
     if expt == "H1":
@@ -338,7 +332,7 @@ def fig_grid(D, lam_of_pdf, shifts, outname):
     _save(fig, outname, dpi=240)
 
 
-# Figs. 5 / 7 -- data/theory, JAM21, five fluxes
+# Figs. 5 / 7
 def fig_ratio(D, lam_of_flux, shifts, outname):
     expt = D["expt"]
     jam = PDF_SPECS[0]

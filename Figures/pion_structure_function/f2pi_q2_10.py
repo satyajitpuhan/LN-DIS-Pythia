@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """F2^pi at Q^2 = 10 GeV^2 for JAM21, xFitter and GRV with PDF uncertainty bands (Fig. 3).
 Uses the GPU through cupy if it is installed.
 """
@@ -15,7 +14,7 @@ from matplotlib.lines import Line2D
 
 warnings.filterwarnings("ignore")
 
-# GPU backend (CuPy) with automatic CPU fallback.
+# GPU backend (CuPy) with automatic CPU fallback
 try:
     import cupy as xp
     GPU = True
@@ -54,7 +53,6 @@ plt.rcParams.update({
     "ytick.major.pad": 8,
 })
 
-# 1. NLO DIS COEFFICIENT-FUNCTION MACHINERY (GPU, vectorized over x_grid)
 CF = 4.0 / 3.0
 TR = 0.5
 
@@ -69,21 +67,14 @@ CHARGE_SQ_SUM = sum(e2 for _, _, e2 in FLAVOR_INFO)
 
 X_FINE = np.logspace(-5, np.log10(1.0 - 1e-8), 5000)
 
-# Fixed-order Gauss-Legendre quadrature nodes/weights on [-1, 1].
-# N_QUAD controls accuracy vs. speed; raise it if you need tighter agreement
-# with the original adaptive-quad results near the z->1 log singularity
-# (which is analytically regulated by the (fz - fx) "+"-distribution terms,
-# so it is finite, just slowly resolved). 200 is generous headroom for a
-# smooth band plot; the whole point of moving to GPU is that a high order
-# here is essentially free.
 N_QUAD = 200
 _GL_NODES_CPU, _GL_WEIGHTS_CPU = np.polynomial.legendre.leggauss(N_QUAD)
-GL_NODES = to_gpu(_GL_NODES_CPU)      # (N_QUAD,)
+GL_NODES = to_gpu(_GL_NODES_CPU)  # (N_QUAD,)
 GL_WEIGHTS = to_gpu(_GL_WEIGHTS_CPU)  # (N_QUAD,)
 
 
 def _build_pdf_grid_cpu(pdf, q2val):
-    """The one unavoidably-CPU step: query LHAPDF on the fixed X_FINE grid."""
+    """Query LHAPDF on the fixed X_FINE grid (CPU)."""
     qval = np.sqrt(q2val)
     pids_needed = [1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 21]
     return {
@@ -93,9 +84,6 @@ def _build_pdf_grid_cpu(pdf, q2val):
 
 
 class GpuPdfGrid:
-    """Holds one member's tabulated PDF grid on the GPU and interpolates
-    xfQ(pid, x) for arbitrary (batched) x arrays, entirely on-device.
-    """
 
     def __init__(self, pdf, q2val):
         grids_cpu = _build_pdf_grid_cpu(pdf, q2val)
@@ -103,9 +91,7 @@ class GpuPdfGrid:
         self.grids = {pid: to_gpu(g) for pid, g in grids_cpu.items()}
 
     def xfq(self, pid, xval):
-        """xval: GPU array of any shape. Returns array of same shape.
-        Matches original semantics: 0 outside (0, 1).
-        """
+        """xval: GPU array of any shape."""
         shape = xval.shape
         flat = xval.reshape(-1)
         out = xp.interp(flat, self.x_fine, self.grids[pid], left=0.0, right=0.0)
@@ -115,7 +101,7 @@ class GpuPdfGrid:
 
 
 def f2_lo_vec(grid, x_arr):
-    """x_arr: GPU array (n_x,). Returns GPU array (n_x,)."""
+    """x_arr: GPU array (n_x,)."""
     total = xp.zeros_like(x_arr)
     for pid_q, pid_qb, e2 in FLAVOR_INFO:
         total = total + e2 * (grid.xfq(pid_q, x_arr) + grid.xfq(pid_qb, x_arr))
@@ -123,9 +109,7 @@ def f2_lo_vec(grid, x_arr):
 
 
 def f2_nlo_vec(pdf, grid, x_arr_cpu, q2val):
-    """Vectorized NLO F2^pi across all x in x_arr_cpu (numpy 1D) for one
-    PDF member. Returns a numpy array of the same length.
-    """
+    """Vectorized NLO F2^pi across all x in x_arr_cpu (numpy 1D) for one PDF member."""
     x_arr = to_gpu(x_arr_cpu.astype(np.float64))
     n_x = x_arr.shape[0]
 
@@ -133,15 +117,14 @@ def f2_nlo_vec(pdf, grid, x_arr_cpu, q2val):
     pref = float(pdf.alphasQ(qval)) / (2.0 * np.pi)
     zmax = 1.0 - 1e-6
 
-    # Map GL nodes on [-1,1] -> z in [x, zmax], per x point.
-    # z[j, k], jac[j] with shape (n_x, N_QUAD) / (n_x,)
-    half_width = (zmax - x_arr) / 2.0                      # (n_x,)
-    mid = (zmax + x_arr) / 2.0                              # (n_x,)
-    z = mid[:, None] + half_width[:, None] * GL_NODES[None, :]   # (n_x, N)
-    w = GL_WEIGHTS[None, :]                                       # (1, N)
-    jac = half_width[:, None]                                     # (n_x, 1)
+    # Map GL nodes on [-1,1] -> z in [x, zmax], per x point
+    half_width = (zmax - x_arr) / 2.0  # (n_x,)
+    mid = (zmax + x_arr) / 2.0  # (n_x,)
+    z = mid[:, None] + half_width[:, None] * GL_NODES[None, :]  # (n_x, N)
+    w = GL_WEIGHTS[None, :]  # (1, N)
+    jac = half_width[:, None]  # (n_x, 1)
 
-    xo = x_arr[:, None] / z                                       # (n_x, N)
+    xo = x_arr[:, None] / z  # (n_x, N)
     valid_xo = xo < 1.0
 
     one_minus_z = 1.0 - z
@@ -153,10 +136,10 @@ def f2_nlo_vec(pdf, grid, x_arr_cpu, q2val):
     c2q_total = xp.zeros(n_x, dtype=xp.float64)
 
     for pid_q, pid_qb, e2 in FLAVOR_INFO:
-        fx = grid.xfq(pid_q, x_arr) + grid.xfq(pid_qb, x_arr)     # (n_x,)
+        fx = grid.xfq(pid_q, x_arr) + grid.xfq(pid_qb, x_arr)  # (n_x,)
         f2_lo_val = f2_lo_val + e2 * fx
 
-        fz = grid.xfq(pid_q, xo) + grid.xfq(pid_qb, xo)           # (n_x, N)
+        fz = grid.xfq(pid_q, xo) + grid.xfq(pid_qb, xo)  # (n_x, N)
         fz = xp.where(valid_xo, fz, 0.0)
 
         integrand1 = xp.where(
@@ -191,7 +174,7 @@ def f2_nlo_vec(pdf, grid, x_arr_cpu, q2val):
         )
         c2q_total = c2q_total + e2 * pref * cq
 
-    fg = grid.xfq(21, xo)                                          # (n_x, N)
+    fg = grid.xfq(21, xo)  # (n_x, N)
     fg = xp.where(valid_xo, fg, 0.0)
     kernel_g = (
         (z ** 2 + one_minus_z ** 2) * (log_one_minus_z - log_z)
@@ -209,10 +192,9 @@ def f2_nlo_vec(pdf, grid, x_arr_cpu, q2val):
     return to_cpu(f2)
 
 
-# 2. PDF SETS  (label, LHAPDF set name, color, linestyle, has_band)
 PDF_SPECS = [
-    ("JAM21",   "JAM21PionPDFnlo", "#0a7cff", "-",  True),   # bright blue
-    ("xFitter", "xFitterPI_NLO_VAR",  "#ff1744", "--", True),   # bright red
+    ("JAM21",   "JAM21PionPDFnlo", "#0a7cff", "-",  True),  # bright blue
+    ("xFitter", "xFitterPI_NLO_VAR",  "#ff1744", "--", True),  # bright red
     ("GRV",     "GRVPI1",             "#00c853", ":",  False),  # bright green
 ]
 
@@ -227,9 +209,7 @@ def all_members(pset):
 
 
 def build_band(pset, curves):
-    """(central, lo, hi) per x, dispatching on error type.
-    replicas/(sym)hessian -> LHAPDF's prescription; variations -> envelope.
-    """
+    """(central, lo, hi) per x, dispatching on error type."""
     n = curves.shape[1]
     central = np.empty(n)
     lo = np.empty(n)
@@ -238,7 +218,7 @@ def build_band(pset, curves):
     if pset.errorType == "variations":
         for j in range(n):
             col = curves[:, j]
-            central[j] = col[0]          # member 0 is the central value
+            central[j] = col[0]  # member 0 is the central value
             lo[j] = col.min()
             hi[j] = col.max()
     else:
@@ -259,7 +239,7 @@ def compute_f2_with_band(set_name, has_band):
 
         curves = np.empty((len(members), len(x_grid)))
         for i, mem in enumerate(members):
-            grid = GpuPdfGrid(mem, Q2_TARGET)          # CPU: LHAPDF grid build
+            grid = GpuPdfGrid(mem, Q2_TARGET)  # CPU: LHAPDF grid build
             curves[i] = f2_nlo_vec(mem, grid, x_grid, Q2_TARGET)  # GPU: batched
             print(f"  {set_name} member {i + 1}/{len(members)} done.")
 
@@ -273,14 +253,12 @@ def compute_f2_with_band(set_name, has_band):
 
 
 def main():
-    # 3. COMPUTE
     results = {}
     for label, set_name, color, ls, has_band in PDF_SPECS:
         cen, lo, hi = compute_f2_with_band(set_name, has_band)
         results[label] = dict(central=cen, lo=lo, hi=hi, color=color, ls=ls)
 
-    # 4. PLOT  (filled bands only -- no central line, no boundary edges)
-    BAND_ALPHA = 0.50   # the band fill itself is the bright element
+    BAND_ALPHA = 0.50
 
     fig, ax = plt.subplots(figsize=(7, 5.5))
     fig.patch.set_facecolor("white")

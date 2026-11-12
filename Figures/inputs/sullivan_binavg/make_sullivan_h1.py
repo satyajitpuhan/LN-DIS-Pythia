@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """H1 Sullivan term averaged over each (x_B, Q^2) bin: 12 x 12 points equally spaced in
 ln x_B and ln Q^2, points with y > 1 left out, on top of the usual average over 12 points
 in each x_L bin.
-
-Usage: python3 make_sullivan_h1.py --prep, then python3 make_sullivan_h1.py
 """
 import argparse
 import os
@@ -15,9 +12,9 @@ sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "common"))
 
-import numpy as np          # noqa: E402
-import lhapdf               # noqa: E402
-import h1_sullivan as OH    # noqa: E402
+import numpy as np
+import lhapdf
+import h1_sullivan as OH
 
 G = OH.f2pi_nlo
 JAM = "JAM21PionPDFnlo"
@@ -62,10 +59,7 @@ def prep(n, workers=6):
 
 
 def binavg(pdf_obj, grid_fn, flux_fn, samples, ylim, label=""):
-    """samples: {(iq, ix): (x_array, q2_array)} -- the points of the cell grid (outer product).
-    Returns {(iq, ix): F2LN[N_XL]}, {(iq, ix): n_points_used}.
-    """
-    n_sub = 12                                   # x_L sub-points per bin, as rebin_pion_to_xl_edges_fast
+    n_sub = 12
     sub = np.concatenate([OH.XL_EDGES[i] + (np.arange(n_sub) + 0.5) * (OH.XL_EDGES[i + 1] - OH.XL_EDGES[i]) / n_sub
                           for i in range(OH.N_XL)])
     flux_grid = np.array([2.0 * float(flux_fn(float(xl))) for xl in sub]).reshape(OH.N_XL, n_sub)
@@ -89,7 +83,7 @@ def binavg(pdf_obj, grid_fn, flux_fn, samples, ylim, label=""):
         xall = np.concatenate(xs_list)
         x_pi = (xall[:, None] / (1.0 - sub[None, :])).ravel()
         vals = G.f2pi_minus_nlo_vec(pdf_obj, grid, x_pi, q2).reshape(len(xall), OH.N_XL, n_sub)
-        vals = (vals * flux_grid[None, :, :]).mean(axis=2)          # x_L sub-point average
+        vals = (vals * flux_grid[None, :, :]).mean(axis=2)  # x_L sub-point average
         k = 0
         for c, m in cells:
             acc[c] += vals[k:k + m].sum(axis=0)
@@ -112,7 +106,6 @@ def nominal_samples():
 
 
 def pdf_setups(mode, n):
-    """[(key, pdf_obj, grid_fn, flux_fn)] exactly as h1_sullivan (previous / new)."""
     p0 = {s: lhapdf.mkPDF(s, 0) for s in (JAM, "xFitterPI_NLO_VAR", "GRVPI1")}
     std = lambda p: (lambda q2: G.PionPdfGrid(p, q2))
     if mode == "previous":

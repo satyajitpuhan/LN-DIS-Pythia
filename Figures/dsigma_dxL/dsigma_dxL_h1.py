@@ -9,25 +9,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 import uproot
 
-# FONT SIZES -- house style.
-# Everything is bold.
-FS_AXLABEL = 26     # x_L and dsigma/dx_L axis labels
-FS_TICK    = 17     # x and y tick numbers
-FS_LEGEND  = 12     # curve legend
-FS_ANNOT   = 13     # kinematic-cut box
-FS_PTLABEL = 16     # the pT-condition box
+# FONT SIZES
+FS_AXLABEL = 26  # x_L and dsigma/dx_L axis labels
+FS_TICK    = 17  # x and y tick numbers
+FS_LEGEND  = 12  # curve legend
+FS_ANNOT   = 13  # kinematic-cut box
+FS_PTLABEL = 16  # the pT-condition box
 
-# Stroke widths used to make text heavier at the SAME font size ('bold' is
-# already the max weight, so extra weight must come from the outline).
-TICK_LABEL_STROKE = 0.6      # Q^2 titles, x_B row labels, numeric ticks
-AXIS_LABEL_STROKE = 0.8      # the big x_L / F_2^{LN} axis labels
+TICK_LABEL_STROKE = 0.6
+AXIS_LABEL_STROKE = 0.8  # the big x_L / F_2^{LN} axis labels
 
 matplotlib.rcParams.update({
     "font.family"        : "serif",
     "font.serif"         : ["Times New Roman", "DejaVu Serif"],
     "font.weight"        : "bold",
     "mathtext.fontset"   : "dejavuserif",
-    "mathtext.default"   : "bfit",     # bold *italic* math (zeus style)
+    "mathtext.default"   : "bfit",  # bold *italic* math (zeus style)
     "axes.labelsize"     : 10,
     "axes.labelweight"   : "bold",
     "axes.titlesize"     : 8,
@@ -53,10 +50,6 @@ matplotlib.rcParams.update({
 
 
 def _stroke(*artists, width=TICK_LABEL_STROKE):
-    """Make text noticeably heavier at the SAME font size by stroking the
-    glyph outlines. Needed because 'bold' is already the maximum weight
-    available, so extra weight has to come from the outline.
-    """
     if width <= 0:
         return
     import matplotlib.patheffects as patheffects
@@ -72,17 +65,14 @@ def bold_ticklabels(ax, width=TICK_LABEL_STROKE):
         t.set_fontweight("bold")
         _stroke(t, width=width)
 
-# -- Colours ------------------------------------------------
-C_DEFAULT      = "#1f77b4"    # blue    - default PDF
-C_CT18         = "#d62728"    # red     - CT18 NLO (thick, solid)
-C_CT18_REMNANT = "#9467bd"    # purple  - CT18 NLO + Remnant
-C_CT18_PTUNE   = "#ff7f0e"    # orange  - CT18NLO+pythia Tune
-C_CT18_GLUON   = "#17becf"    # cyan    - CT18 + gluon
+# Colours
+C_DEFAULT      = "#1f77b4"  # blue
+C_CT18         = "#d62728"  # red
+C_CT18_REMNANT = "#9467bd"  # purple
+C_CT18_PTUNE   = "#ff7f0e"  # orange
+C_CT18_GLUON   = "#17becf"  # cyan
 C_DATA         = "black"
 
-# Ordered list of (key, display label, color, linestyle, linewidth) used
-# throughout. Pythia default is solid; CT18 NLO is a thick solid red line;
-# the remaining variants are distinguished purely by dash pattern.
 PDF_SETS = [
     ("default",     "Pythia default",     C_DEFAULT,      "solid",   2.4),
     ("ct18",        "CT18 NLO",           C_CT18,          "solid",   3.4),
@@ -91,11 +81,10 @@ PDF_SETS = [
     ("ct18gluon",   "CT18 NLO + Gluon",   C_CT18_GLUON,    "dashdot", 2.4),
 ]
 
-# Back-compat aliases (older code referred to these names).
+# aliases
 ANNOT_FONTSIZE = FS_ANNOT
 PT_LABEL_FONTSIZE = FS_PTLABEL
 
-# -- Kinematic cuts (identical to oa.py) --------------------
 Q2_MIN=6.0;   Q2_MAX=100.0
 X_MIN=1.5e-4; X_MAX=3.0e-2
 Y_MIN=0.02;   Y_MAX=0.6
@@ -105,13 +94,12 @@ THETA_E_MIN=156.0*np.pi/180.0
 THETA_E_MAX=175.0*np.pi/180.0
 THETA_N_MAX=0.75e-3
 
-# -- Binning ------------------------------------------------
+# Binning
 XMIN=0.0; XMAX=1.0; NBINS=20
 BW=(XMAX-XMIN)/NBINS
 x_edges=np.linspace(XMIN, XMAX, NBINS+1)
 x_centers=0.5*(x_edges[:-1]+x_edges[1:])
 
-# -- H1 data (identical to oa.py) ---------------------------
 h1_edges  = np.array([0.30,0.37,0.44,0.51,0.58,0.65,0.72,0.79,0.86,0.93,1.00])
 xd_centers= 0.5*(h1_edges[:-1]+h1_edges[1:])
 xd_err    = 0.5*(h1_edges[1:]-h1_edges[:-1])
@@ -126,7 +114,6 @@ err_02 =np.sqrt(np.array([0.09,0.07,0.06,0.05,0.05,0.05,0.05,0.04,0.03,0.01])**2
 N_DIS_FIXED = 500_000_000
 
 
-# LOADER
 def pick(av, candidates):
     for c in candidates:
         if c in av: return c
@@ -134,9 +121,6 @@ def pick(av, candidates):
 
 
 def load_alllf_generic(path, label, pt_mode):
-    """Load an alllf-style ROOT file, apply kinematic + pT cuts,
-    return (dsig array [nb], sigmaGen, cut-flow dict).
-    """
     with uproot.open(path) as f:
         # find the tree
         tree = None
@@ -201,7 +185,7 @@ def load_alllf_generic(path, label, pt_mode):
     h_n, _ = np.histogram(xl[sel], bins=x_edges)
     dsig    = sigmaGen * h_n / n_total / BW
 
-    # -- terminal summary ------------------------------------
+    # terminal summary
     print(f"\n  [{label} | {pt_mode}]")
     print(f"    sigmaGen                 = {sigmaGen:.6f} nb")
     print(f"    N_total (N_DIS_FIXED)    = {int(n_total):>10,}  ← denominator")
@@ -216,7 +200,6 @@ def load_alllf_generic(path, label, pt_mode):
     return dsig, sigmaGen, cutflow
 
 
-# PLOT HELPERS
 def style_ax(ax, ylabel=r"$\mathbf{d\sigma/dx_L\ [nb]}$"):
     ax.set_xlabel(r"$\mathbf{x_L}$", fontsize=FS_AXLABEL, labelpad=6)
     ax.set_ylabel(ylabel, fontsize=FS_AXLABEL, labelpad=6)
@@ -232,11 +215,7 @@ def style_ax(ax, ylabel=r"$\mathbf{d\sigma/dx_L\ [nb]}$"):
     bold_ticklabels(ax)
 
 
-# FIGURE 1 - Main 2-panel comparison (xl069 left, pt02 right)
 def make_comparison(curves_xl, curves_02, out):
-    """curves_xl / curves_02: dict {key: (dsig_array, sigmaGen)} for each PDF set,
-    keyed by the same keys as PDF_SETS.
-    """
     fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(17, 7.2))
 
     def _panel(ax, curves, data_y, data_err, tag, pt_lbl, show_leg):
@@ -257,7 +236,6 @@ def make_comparison(curves_xl, curves_02, out):
     _panel(ax_b, curves_02, dsig_02, err_02,
            "b", r"$p_T \leq 0.2\ \mathrm{GeV}$", False)
 
-    # Overall figure header and per-panel (a)/(b) tags removed per request.
     fig.tight_layout()
     fname = f"{out}_comparison.png"
     fig.savefig(fname, dpi=220, bbox_inches="tight")
@@ -268,7 +246,6 @@ def make_comparison(curves_xl, curves_02, out):
     plt.close(fig)
 
 
-# FIGURE 2 - Detail plot (main panel only, one per pT mode)
 def make_detail(curves, data_y, data_err, pt_lbl, pt_tag, out):
     fig, ax_main = plt.subplots(figsize=(9.5, 7.5))
 
@@ -294,8 +271,6 @@ def make_detail(curves, data_y, data_err, pt_lbl, pt_tag, out):
     ax_main.minorticks_on()
     bold_ticklabels(ax_main)
 
-    # Overall figure header removed per request.
-
     fname = f"{out}_detail_{pt_tag}.png"
     fig.savefig(fname, dpi=220, bbox_inches="tight")
     print(f"  → {fname}")
@@ -305,7 +280,6 @@ def make_detail(curves, data_y, data_err, pt_lbl, pt_tag, out):
     plt.close(fig)
 
 
-# PRINT SUMMARY TABLE
 def print_summary(curves_xl, curves_02):
     col_w = 16
     keys_present = [k for k,*_ in PDF_SETS if k in curves_xl]
@@ -340,7 +314,6 @@ def print_summary(curves_xl, curves_02):
     print(sep)
 
 
-# MAIN
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -393,14 +366,14 @@ def main():
     if not curves_xl:
         raise SystemExit("No input ROOT files were loaded — nothing to plot.")
 
-    # -- Summary table ----------------------------------------
+    # Summary table
     print_summary(curves_xl, curves_02)
 
-    # -- Figure 1: side-by-side comparison -------------------
+    # Figure 1: side-by-side comparison
     print("\n── Saving figures ──")
     make_comparison(curves_xl, curves_02, args.out)
 
-    # -- Figure 2a/2b: detail plots ---------------------------
+    # Figure 2a/2b: detail plots
     make_detail(curves_xl, dsig_xl, err_xl,
                 r"$p_T \leq x_L\times0.69\ \mathrm{GeV}$", "xl069", args.out)
     make_detail(curves_02, dsig_02, err_02,

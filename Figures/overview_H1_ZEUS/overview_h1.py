@@ -7,7 +7,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "common"))
-import grids  # noqa: E402
+import grids
 
 m = grids.load_original("h1_five_settings")
 grids.check_h1_cuts(m)

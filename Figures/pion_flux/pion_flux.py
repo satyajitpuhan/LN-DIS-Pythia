@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""Pion flux f(x_L) for the five regulators with the H1 and ZEUS p_T cuts (Fig. 2).
-
-JAM21 uses the JAM18 cutoffs, xFitter and GRV the cutoffs from ../lambda_fit.
-"""
+"""Pion flux f(x_L) for the five regulators with the H1 and ZEUS p_T cuts (Fig. 2)."""
 
 import csv
 import os
@@ -111,7 +107,6 @@ def flux_piN(xL, model, lam, k2max):
     return val
 
 
-# Models (key, legend name, colour, linestyle)
 FLUX_MODELS = [
     ("s_exp",         "s-exp",         "navy",      "-"),
     ("t_exp",         "t-exp",         "crimson",   "--"),
@@ -160,7 +155,7 @@ def main():
             for key, *_ in FLUX_MODELS:
                 curves[(r, c, key)] = np.array([flux_piN(x, key, lam[key], k2f(x)) for x in xg])
 
-    PW, PH = 4.3, 3.5                                 # panel size (inches)
+    PW, PH = 4.3, 3.5  # panel size (inches)
     ML, MR, MB, MT = 1.25, 0.15, 0.95, 0.15
     nr, nc = len(PT_CUTS), len(cols)
     fw, fh = ML + nc * PW + MR, MB + nr * PH + MT
@@ -171,7 +166,7 @@ def main():
 
     for r, (tag, _k2f, tag_loc) in enumerate(PT_CUTS):
         ymax = max(float(np.nanmax(curves[(r, c, key)])) for c in range(nc) for key, *_ in FLUX_MODELS)
-        ytop = 1.30 * ymax                            # headroom for the legend / cut box
+        ytop = 1.30 * ymax  # headroom for the legend / cut box
         step = 0.01 if ytop < 0.1 else 0.02
         yt = [v for v in np.arange(step, ytop, step) if v < ytop - 0.6 * step]
         for c, (name, lam, fmt) in enumerate(cols):
@@ -181,8 +176,8 @@ def main():
                         label=rf"{lbl}  ($\Lambda={fmt.format(lam[key])}$)")
             ax.set_xlim(0.0, 1.0)
             ax.set_ylim(0.0, ytop)
-            ax.set_xticks([0.2, 0.4, 0.6, 0.8])      # 0 and 1 dropped (panels touch)
-            ax.set_yticks(yt)                         # 0 and the top dropped (panels touch)
+            ax.set_xticks([0.2, 0.4, 0.6, 0.8])  # 0 and 1 dropped (panels touch)
+            ax.set_yticks(yt)  # 0 and the top dropped (panels touch)
             ax.xaxis.set_minor_locator(AutoMinorLocator(2))
             ax.yaxis.set_minor_locator(AutoMinorLocator(2))
             ax.xaxis.set_major_formatter(FuncFormatter(_num))
@@ -191,13 +186,13 @@ def main():
             ax.grid(True, which="major", ls="--", alpha=0.25)
             for t in ax.get_xticklabels() + ax.get_yticklabels():
                 t.set_fontweight("bold")
-            if c == 0:                                # H1 / ZEUS cut box once per row (first column)
+            if c == 0:
                 at = AnchoredText(tag, loc=tag_loc, frameon=True, pad=0.35, borderpad=0.5,
                                   prop=dict(fontsize=13, fontweight="bold"))
                 at.patch.set_boxstyle("square")
                 at.patch.set_linewidth(1.1)
                 ax.add_artist(at)
-            if r == 0:                                # PDF name inside the panel, top-right corner
+            if r == 0:
                 nm = AnchoredText(name, loc="upper right", frameon=False, pad=0.3, borderpad=0.4,
                                   prop=dict(fontsize=19, fontweight="bold"))
                 ax.add_artist(nm)
