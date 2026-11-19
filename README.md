@@ -85,8 +85,9 @@ final-state neutron with the highest energy, x_L = E_n/E_p.
 ## Pion PDFs and pion flux
 
 - JAM21: we always use the mean of the replicas as the central PDF. Member 0 of the
-  JAM21PionPDFnlo set is not the replica mean (it differs by 2-20%), so it is not used. The
-  only exception are the EIC projections (Figs. 14-16), which still use member 0.
+  JAM21PionPDFnlo set is not the replica mean (it differs by 2-20%), so it is not used. This
+  includes the EIC projections (Figs. 14-16); eic_f2ln.py --jam21-member0 gives member 0 as
+  in arXiv v1.
 - xFitter: member 0, with the envelope of the variations as the band
 - GRV: GRVPI1
 

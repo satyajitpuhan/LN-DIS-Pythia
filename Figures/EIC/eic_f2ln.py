@@ -4,7 +4,7 @@ with JAM21, xFitter and GRV (Figs. 14-16). Each beam setting has its own (x_B, Q
 binning, see CFG_BINNING.
 """
 
-import argparse, os, warnings
+import argparse, os, sys, time, warnings
 PYTHIA_OUT = os.environ.get("PYTHIA_OUT", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Pythia", "output"))
 from functools import lru_cache
 
@@ -370,116 +370,142 @@ def _legend(ax, ncol=1, fontsize=FS_LEGEND):
     return _bold_legend(leg)
 
 
-class PionPDF:
-    __slots__ = ("key", "setname", "label", "color", "pdf", "_memo")
+# NLO F2 of the pi-, vectorised: on the GPU with cupy if it is installed, else numpy
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "common"))
+import f2pi_nlo as F2V  # noqa: E402
 
-    def __init__(self, key, setname, label, color, pdf):
+# JAM21 is the mean of its replicas, as everywhere else in the paper (member 0 of
+# JAM21PionPDFnlo is not the replica mean). --jam21-member0 gives member 0 (arXiv v1).
+JAM21_REPLICA_MEAN = True
+MEAN_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cache",
+                          "jam21_replica_mean_eic.npz")
+REPLICA_CHUNK = 50  # replicas held in memory at a time
+
+
+def _accumulate(pdfs, q2_list, acc):
+    """acc[iq, ip, :] += x f(x, Q^2) on F2V.X_FINE for every PDF in pdfs.
+
+    As in the scalar code of arXiv v1, x f = 0 outside the x range of the set; Q^2 is
+    already clamped to the Q^2 range of the set by the caller.
+    """
+    m0 = pdfs[0]
+    inside = (F2V.X_FINE >= m0.xMin) & (F2V.X_FINE <= m0.xMax)
+    xs = F2V.X_FINE[inside].tolist()
+    for m in pdfs:
+        for iq, q2 in enumerate(q2_list):
+            qs = [q2] * len(xs)
+            for ip, pid in enumerate(F2V.PIDS_NEEDED):
+                acc[iq, ip, inside] += m.xfxQ2(pid, xs, qs)
+
+
+def replica_mean_tables(setname, q2_list):
+    """x f(x, Q^2) averaged over replicas 1..N at every Q^2 in q2_list, on F2V.X_FINE.
+
+    The replicas are loaded REPLICA_CHUNK at a time, so only a few are in memory at once.
+    The result is cached on disk per Q^2.
+    """
+    cache = {}
+    if os.path.exists(MEAN_CACHE):
+        with np.load(MEAN_CACHE) as z:
+            cache = {k: z[k] for k in z.files}
+    key = lambda q2: f"{setname}|{q2:.9g}|{len(F2V.X_FINE)}"
+    todo = [q2 for q2 in q2_list if key(q2) not in cache]
+    if todo:
+        n = lhapdf.getPDFSet(setname).size
+        acc = np.zeros((len(todo), len(F2V.PIDS_NEEDED), len(F2V.X_FINE)))
+        t0 = time.time()
+        verb = lhapdf.verbosity()
+        lhapdf.setVerbosity(0)
+        try:
+            for start in range(1, n, REPLICA_CHUNK):
+                stop = min(start + REPLICA_CHUNK, n)
+                chunk = [lhapdf.mkPDF(setname, i) for i in range(start, stop)]
+                _accumulate(chunk, todo, acc)
+                del chunk
+                print(f"    {setname}: replicas {start}-{stop - 1} of {n - 1} done "
+                      f"({len(todo)} Q2 values, {time.time() - t0:5.1f} s)", flush=True)
+        finally:
+            lhapdf.setVerbosity(verb)
+        acc /= (n - 1)
+        for q2, a in zip(todo, acc):
+            cache[key(q2)] = a
+        os.makedirs(os.path.dirname(MEAN_CACHE), exist_ok=True)
+        np.savez(MEAN_CACHE, **cache)
+    return [cache[key(q2)] for q2 in q2_list]
+
+
+class _Table(F2V.PionPdfGrid):
+    """x f(x, Q^2) at one Q^2 on F2V.X_FINE, from an array (n_pids, n_x)."""
+
+    def __init__(self, arr, q2):
+        self.q2 = q2
+        self.log_x = F2V.to_gpu(F2V._LOG_X_FINE)
+        self.grids = {pid: F2V.to_gpu(arr[i]) for i, pid in enumerate(F2V.PIDS_NEEDED)}
+
+
+class PionPDF:
+    """A pion PDF set: member 0, or the mean of the replicas (JAM21).
+
+    x f(x, Q^2) is tabulated at every Q^2 that is needed and F2 is computed from the
+    tables with f2pi_nlo.f2pi_minus_nlo_vec. Q^2 is clamped to the Q^2 range of the set,
+    as in the scalar code of arXiv v1.
+    """
+
+    def __init__(self, key, setname, label, color, replica_mean=False):
         self.key, self.setname = key, setname
         self.label, self.color = label, color
-        self.pdf   = pdf
-        self._memo = {}
+        self.replica_mean = replica_mean
+        self.pdf = lhapdf.mkPDF(setname, 0)  # alpha_s (same for all replicas), ranges
+        self._tabs = {}
 
     def __repr__(self):
         return f"<PionPDF {self.key}: {self.setname}>"
+
+    def clamp_q2(self, q2):
+        return min(max(float(q2), self.pdf.q2Min), self.pdf.q2Max)
+
+    def prepare(self, q2_list):
+        todo = sorted({self.clamp_q2(q) for q in q2_list} - set(self._tabs))
+        if not todo:
+            return
+        if self.replica_mean:
+            arrs = replica_mean_tables(self.setname, todo)
+        else:
+            acc = np.zeros((len(todo), len(F2V.PIDS_NEEDED), len(F2V.X_FINE)))
+            _accumulate([self.pdf], todo, acc)
+            arrs = list(acc)
+        for q2, a in zip(todo, arrs):
+            self._tabs[q2] = _Table(a, q2)
+
+    def release(self):
+        self._tabs.clear()  # free the GPU tables
+
+    def f2pi(self, x, q2):
+        """NLO F2 of the pi- at all x (1-D numpy) and one Q^2; 0 for x outside (0, 1)."""
+        q2c = self.clamp_q2(q2)
+        return F2V.f2pi_minus_nlo_vec(self.pdf, self._tabs[q2c], x, q2c)
 
 
 def load_pion_pdfs(sets=PION_PDF_SETS):
     loaded = []
     for key, setname, label, color in sets:
-        print(f"Loading pion PDF '{label}'  ({setname}, member 0) ...")
+        mean = key == "jam21" and JAM21_REPLICA_MEAN
+        print(f"Loading pion PDF '{label}'  ({setname}, "
+              f"{'mean of the replicas' if mean else 'member 0'}) ...")
         try:
-            pdf = lhapdf.mkPDF(setname, 0)
+            pp = PionPDF(key, setname, label, color, replica_mean=mean)
         except Exception as e:
             print(f"  !!! could not load {setname!r}: {e}")
             continue
+        pdf = pp.pdf
         print(f"  x=[{pdf.xMin:.2e}, {pdf.xMax:.2e}]  "
               f"Q2=[{pdf.q2Min:.2e}, {pdf.q2Max:.2e}]")
-        loaded.append(PionPDF(key, setname, label, color, pdf))
+        loaded.append(pp)
     if not loaded:
         raise RuntimeError("No pion PDF set could be loaded -- nothing to plot.")
+    print(f"  F2 of the pion computed on: {F2V.backend_name()}")
     return loaded
 
-
-_CF = 4.0 / 3.0;  _TR = 0.5
-
-def _Cq2_singular(z):
-    if z <= 0.0 or z >= 1.0: return 0.0
-    return _CF * (1.0 + z**2) * (np.log((1.0 - z) / z) - 0.75)
-
-def _Cq2_regular(z):
-    return _CF * (1.5 + 2.0 * z)
-
-_Cq2_DELTA = _CF * (np.pi**2 / 3.0 - 9.0 / 2.0)
-
-def _Cg2_kernel(z):
-    if z <= 0.0 or z >= 1.0: return 0.0
-    split = (z**2 + (1.0 - z)**2) * np.log((1.0 - z) / z)
-    poly  = -1.0 + 8.0 * z * (1.0 - z)
-    return 2.0 * _TR * (split + poly)
-
-_E2_u = (2/3)**2;  _E2_d = (1/3)**2;  _E2_s = (1/3)**2
-_E2_c = (2/3)**2;  _E2_b = (1/3)**2
-_CHARGE_SQ_SUM = _E2_u + _E2_d + _E2_s + _E2_c + _E2_b
-
-_FLAVOR_MAP_PIMINUS = [(1,-1,_E2_u),(2,-2,_E2_d),(3,-3,_E2_s),(4,-4,_E2_c),(5,-5,_E2_b)]
-
-def _xfq(pdf, pid, x, Q2):
-    if x <= 0.0 or x >= 1.0:
-        return 0.0
-    if x < pdf.xMin or x > pdf.xMax:
-        return 0.0
-    q2 = float(Q2)
-    if q2 < pdf.q2Min: q2 = pdf.q2Min
-    if q2 > pdf.q2Max: q2 = pdf.q2Max
-    try:
-        return pdf.xfxQ2(pid, float(x), q2)
-    except Exception:
-        return 0.0
-
-def _alpha_s(pdf, Q2):
-    q2 = float(Q2)
-    if q2 < pdf.q2Min: q2 = pdf.q2Min
-    if q2 > pdf.q2Max: q2 = pdf.q2Max
-    return pdf.alphasQ(np.sqrt(q2))
-
-def compute_f2pi_minus_allflav_nlo(x, pdf, Q2):
-    if x <= 0.0 or x >= 1.0: return 0.0
-    alpha_s = _alpha_s(pdf, Q2)
-    pref = alpha_s / (2.0 * np.pi)
-    F2   = 0.0
-    def integ_bdy(z): return _Cq2_singular(z) / (1.0 - z)
-    bdy_int, _ = quad(integ_bdy, 0.0, x, limit=60)
-    for pid_q, pid_qb, e2 in _FLAVOR_MAP_PIMINUS:
-        xqq = _xfq(pdf, pid_q, x, Q2) + _xfq(pdf, pid_qb, x, Q2)
-        F2 += e2 * xqq
-        def integ_plus(z, _xqq=xqq, _pq=pid_q, _pqb=pid_qb):
-            xz = x / z
-            fv = (_xfq(pdf, _pq, xz, Q2) + _xfq(pdf, _pqb, xz, Q2)) if xz < 1.0 else 0.0
-            return _Cq2_singular(z) * (fv - _xqq) / (1.0 - z)
-        plus_c, _ = quad(integ_plus, x, 1.0 - 1e-6, limit=60)
-        I_plus = plus_c - xqq * bdy_int
-        def integ_reg(z, _pq=pid_q, _pqb=pid_qb):
-            xz = x / z
-            if xz >= 1.0: return 0.0
-            return _Cq2_regular(z) * (_xfq(pdf, _pq, xz, Q2) + _xfq(pdf, _pqb, xz, Q2))
-        reg_c, _  = quad(integ_reg, x, 1.0 - 1e-6, limit=60)
-        I_delta   = _Cq2_DELTA * xqq
-        F2 += e2 * pref * (I_plus + reg_c + I_delta)
-    def integ_gluon(z):
-        xz = x / z
-        if xz >= 1.0: return 0.0
-        return _Cg2_kernel(z) * _xfq(pdf, 21, xz, Q2)
-    gluon_c, _ = quad(integ_gluon, x, 1.0 - 1e-6, limit=100)
-    F2 += pref * _CHARGE_SQ_SUM * gluon_c
-    return F2
-
-def _f2pi_cached(ppdf, x, Q2):
-    key = (round(float(x), 12), round(float(Q2), 9))
-    val = ppdf._memo.get(key)
-    if val is None:
-        val = compute_f2pi_minus_allflav_nlo(float(x), ppdf.pdf, float(Q2))
-        ppdf._memo[key] = val
-    return val
 
 # pion flux (Model I)
 _M_N=0.9382720813; _M_PI=0.13957039; _G_A=1.267; _F_PI=0.093
@@ -525,39 +551,25 @@ def k2max_for_config(E_p):
     return f
 
 
-def _f2ln_pointwise(ppdf, xL, xbj, q2, k2max):
-    x_pi = xbj / (1.0 - xL)
-    if x_pi <= 0.0 or x_pi >= 1.0: return 0.0
-    return 2.0 * f_piN_model_i(float(xL), float(k2max)) * \
-           _f2pi_cached(ppdf, x_pi, q2)
-
-
 def rebin_pdf_to_xl_edges(ppdf, k2max_fn, binning, n_sub=12, verbose=True,
                           tag=""):
+    """Sullivan F2LN per (Q2, x_B) cell, averaged over n_sub points in each x_L bin."""
+    cells = [(iq, ix) for ix in range(binning.nx) for iq in range(binning.nq)]
+    ppdf.prepare([binning.q2_rep[c] for c in cells])
+    sub = np.array([XL_EDGES[i] + (np.arange(n_sub) + 0.5) * (XL_EDGES[i+1] - XL_EDGES[i]) / n_sub
+                    for i in range(N_XL)])  # (N_XL, n_sub)
+    flux = np.array([[2.0 * f_piN_model_i(float(xL), float(k2max_fn(float(xL))))
+                      for xL in row] for row in sub])
     hist = {}
-    n_cells = binning.nq * binning.nx
-    done = 0
-    for ix in range(binning.nx):
-        for iq in range(binning.nq):
-            cell = (iq, ix)
-            xbj = binning.x_rep[cell]
-            q2  = binning.q2_rep[cell]
-            vals = np.zeros(N_XL)
-            for i in range(N_XL):
-                lo, hi = XL_EDGES[i], XL_EDGES[i+1]
-                sub    = lo + (np.arange(n_sub)+0.5)*(hi-lo)/n_sub
-                yv     = np.array([_f2ln_pointwise(ppdf, float(xL), xbj, q2,
-                                                   k2max_fn(float(xL)))
-                                   for xL in sub])
-                vals[i] = yv.mean()
-            hist[cell] = vals
-            done += 1
-            if verbose:
-                print(f"  [{ppdf.label}{tag}] cell {done:2d}/{n_cells}: "
-                      f"<x_B>={xbj:.3e}, <Q2>={q2:.3g}   ", end="\r")
+    for cell in cells:
+        xbj, q2 = binning.x_rep[cell], binning.q2_rep[cell]
+        x_pi = xbj / (1.0 - sub)
+        f2 = ppdf.f2pi(x_pi.ravel(), q2).reshape(sub.shape)  # 0 for x_pi >= 1
+        hist[cell] = (flux * f2).mean(axis=1)
+    ppdf.release()
     if verbose:
-        print(f"  [{ppdf.label}{tag}] done: {n_cells} (Q2, xB) cells x {N_XL} "
-              f"x_L bins                          ")
+        print(f"  [{ppdf.label}{tag}] done: {len(cells)} (Q2, xB) cells x {N_XL} "
+              f"x_L bins")
     return hist
 
 
@@ -1499,7 +1511,7 @@ def dump_binning_table(name, binning, E_e, E_p):
 
 def main():
     global K2_CAP, OUT_DIR, NAME_TAG, YLOG, HIDE_EMPTY_PANELS, REF_HLINES
-    global DROP_PARTIAL_BINS
+    global DROP_PARTIAL_BINS, JAM21_REPLICA_MEAN
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--root-5x41",   default=CONFIGS[0][1])
@@ -1542,8 +1554,12 @@ def main():
                              "shared LOG axis, because the grid spans several "
                              "decades and on a linear scale the low-rate "
                              "panels sit flat against the axis")
+    parser.add_argument("--jam21-member0", action="store_true",
+                        help="use member 0 of JAM21PionPDFnlo instead of the mean "
+                             "of the replicas (as in arXiv v1)")
     args = parser.parse_args()
 
+    JAM21_REPLICA_MEAN = not args.jam21_member0
     YLOG     = not args.ylinear
     DROP_PARTIAL_BINS = not args.keep_partial
     HIDE_EMPTY_PANELS = not args.keep_empty
@@ -1562,8 +1578,9 @@ def main():
     print()
     pion_pdfs = load_pion_pdfs()
     ppdf = next((p for p in pion_pdfs if p.key == MAIN_PION_KEY), pion_pdfs[0])
-    print(f"\nPion PDF sets loaded (member 0): "
-          f"{', '.join(p.label for p in pion_pdfs)}")
+    print(f"\nPion PDF sets loaded: "
+          f"{', '.join(p.label for p in pion_pdfs)}  (JAM21: "
+          f"{'mean of the replicas' if JAM21_REPLICA_MEAN else 'member 0'})")
     print(f"  background+pion figure uses: {ppdf.label} ({ppdf.setname})")
     if not args.no_totals and len(pion_pdfs) > 1:
         print(f"  totals figure compares    : "
