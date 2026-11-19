@@ -38,8 +38,8 @@ The other folders:
 We use JAM21 (JAM21PionPDFnlo), xFitter (xFitterPI_NLO_VAR) and GRV (GRVPI1) from LHAPDF.
 For JAM21 we always take the mean of the replicas as the central PDF. Member 0 of the
 JAM21PionPDFnlo set is not the replica mean (it differs by 2-20%), so it is not used. For
-xFitter and GRV member 0 is the central set. The only exception are the EIC projections
-(Figs. 14-16), which still use member 0 of JAM21.
+xFitter and GRV member 0 is the central set. This includes the EIC projections
+(Figs. 14-16); eic_f2ln.py --jam21-member0 gives member 0 of JAM21, as in arXiv v1.
 
 For JAM21 the cutoffs of the pion flux are the JAM18 values. For xFitter and GRV they come
 from the fit in lambda_fit (lambda_fit_results.csv), which uses the two largest x_L bins of
